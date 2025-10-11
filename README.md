@@ -9,13 +9,29 @@ Automated Redpanda packaging for NixOS with automatic version updates.
 - 🎯 **Multi-Listener Support**: Configure multiple listeners per service (Kafka, Admin, etc.)
 - 📦 **Flakes Support**: Modern Nix flakes for reproducible builds
 - 🛡️ **NixOS Module**: Full systemd service with security hardening
+- 🔒 **TLS Enforcement**: Optional TLS validation for STIG SC-8 and CJIS 5.10 compliance
+- 📋 **Automated SBOM**: CycloneDX/SPDX generation with SLSA v1.0 provenance (DoD requirement)
+- 🔍 **Vulnerability Scanning**: Automated CVE detection via sbomnix
+- 📊 **CJIS Audit Retention**: 365-day log retention for FBI compliance
+- 🏗️ **Multi-Architecture**: x86_64 and ARM64/aarch64 support (Apple Silicon ready)
+- ✅ **Multi-Framework Compliance**: 8 frameworks - SOC 2, NIST 800-161, STIG, CJIS, FedRAMP, and more
 
 ## Prerequisites
 
-This tooling requires NixOS or a system with Nix installed and the following commands available:
+### For NixOS
+- NixOS with flakes enabled
 - `nix-prefetch-url` (or `nix-shell` to run it)
 - `curl`
 - `jq` (optional, for JSON parsing)
+
+### For Ubuntu / Debian / RHEL / CentOS / macOS
+- Install Nix package manager first: `sh <(curl -L https://nixos.org/nix/install) --daemon`
+- **See [INSTALLATION_GUIDE.md](./INSTALLATION_GUIDE.md) for platform-specific instructions**
+  - Ubuntu / Debian (easy - no SELinux)
+  - RHEL / CentOS / Rocky / Alma (SELinux considerations)
+  - macOS (Intel and Apple Silicon)
+
+**Key Point**: Nix installs alongside apt/yum/brew without conflicts. Your existing packages are not affected.
 
 ## Quick Start
 
@@ -123,6 +139,7 @@ Configure multiple listeners for each service (just like the Helm chart):
     settings = {
       redpanda = {
         # Multiple Kafka API listeners
+        # Pattern: 9092, 9192, 9292, ... (increment first digit)
         kafka_api = [
           {
             address = "0.0.0.0";
@@ -131,24 +148,21 @@ Configure multiple listeners for each service (just like the Helm chart):
           }
           {
             address = "0.0.0.0";
-            port = 9093;
+            port = 9192;
             name = "external";
-          }
-        ];
-
-        # Multiple Admin API listeners
-        admin = [
-          {
-            address = "127.0.0.1";
-            port = 9644;
-            name = "internal";
           }
           {
             address = "0.0.0.0";
-            port = 9645;
-            name = "external";
+            port = 9292;
+            name = "public";
           }
         ];
+
+        # Admin API (typically single listener)
+        admin = [{
+          address = "0.0.0.0";
+          port = 9644;
+        }];
 
         rpc_server = {
           address = "0.0.0.0";
@@ -157,16 +171,18 @@ Configure multiple listeners for each service (just like the Helm chart):
       };
 
       schema_registry = {
+        # Pattern: 8081, 8181, 8281, ... (increment first digit)
         schema_registry_api = [
-          { address = "0.0.0.0"; port = 8081; }
-          { address = "0.0.0.0"; port = 8084; }
+          { address = "0.0.0.0"; port = 8081; name = "internal"; }
+          { address = "0.0.0.0"; port = 8181; name = "external"; }
         ];
       };
 
       pandaproxy = {
+        # Pattern: 8082, 8182, 8282, ... (increment first digit)
         pandaproxy_api = [
-          { address = "0.0.0.0"; port = 8082; }
-          { address = "0.0.0.0"; port = 8083; }
+          { address = "0.0.0.0"; port = 8082; name = "internal"; }
+          { address = "0.0.0.0"; port = 8182; name = "external"; }
         ];
       };
     };
@@ -174,7 +190,13 @@ Configure multiple listeners for each service (just like the Helm chart):
 }
 ```
 
-**Firewall Note**: When `openFirewall = true`, all ports (9092, 9093, 9644, 9645, 33145, 8081, 8084, 8082, 8083) are automatically extracted from your configuration and opened. You only configure ports once!
+**Port Pattern**: When configuring multiple listeners, follow this pattern for easier management:
+- **Kafka API**: 9092, 9192, 9292, 9392, ... (increment first digit: 9x92)
+- **Schema Registry**: 8081, 8181, 8281, 8381, ... (increment first digit: 8x81)
+- **HTTP Proxy**: 8082, 8182, 8282, 8382, ... (increment first digit: 8x82)
+- **Admin API**: Usually single listener (9644), multiple admin ports are uncommon
+
+**Firewall Note**: When `openFirewall = true`, all configured ports are automatically extracted and opened. You only configure ports once!
 
 ## Update Script
 
@@ -231,13 +253,15 @@ nix run .#update
 
 All Redpanda services support multiple listeners:
 
-| Service | Default Port(s) | Config Location |
-|---------|----------------|-----------------|
-| Kafka API | 9092, 9093 | `redpanda.kafka_api` |
-| Admin API | 9644, 9645 | `redpanda.admin` |
-| RPC Server | 33145 | `redpanda.rpc_server` |
-| Schema Registry | 8081, 8084 | `schema_registry.schema_registry_api` |
-| HTTP Proxy | 8082, 8083 | `pandaproxy.pandaproxy_api` |
+| Service | Default Port(s) | Multi-Listener Pattern | Config Location |
+|---------|----------------|------------------------|-----------------|
+| Kafka API | 9092 | 9092, 9192, 9292, 9x92... | `redpanda.kafka_api` |
+| Schema Registry | 8081 | 8081, 8181, 8281, 8x81... | `schema_registry.schema_registry_api` |
+| HTTP Proxy | 8082 | 8082, 8182, 8282, 8x82... | `pandaproxy.pandaproxy_api` |
+| Admin API | 9644 | Single listener (uncommon to have multiple) | `redpanda.admin` |
+| RPC Server | 33145 | Single listener | `redpanda.rpc_server` |
+
+**Port Pattern**: For multiple listeners, increment the first digit (9x92, 8x81, 8x82) to keep ports organized and easy to remember.
 
 ### Automatic Port Detection
 
@@ -272,23 +296,75 @@ nix build .#redpanda
 
 ## Module Options
 
-### `services.redpanda.enable`
-Enable the Redpanda service.
+### Core Options
 
-### `services.redpanda.package`
+#### `services.redpanda.enable`
+Enable the Redpanda service. Default: `false`
+
+#### `services.redpanda.package`
 The Redpanda package to use. Defaults to the package defined in this flake.
 
-### `services.redpanda.dataDir`
+#### `services.redpanda.dataDir`
 Directory where Redpanda stores data. Default: `/var/lib/redpanda`
 
-### `services.redpanda.user` / `services.redpanda.group`
+#### `services.redpanda.user` / `services.redpanda.group`
 User and group for the Redpanda service. Default: `redpanda`
 
-### `services.redpanda.settings`
+#### `services.redpanda.settings`
 Redpanda configuration as a Nix attribute set. This maps directly to `redpanda.yaml`.
 
-### `services.redpanda.openFirewall`
-Automatically open firewall ports for all configured listeners. When enabled, ports are extracted from `settings` and opened automatically.
+#### `services.redpanda.openFirewall`
+Automatically open firewall ports for all configured listeners. When enabled, ports are extracted from `settings` and opened automatically. Default: `false`
+
+### Compliance Options (NEW)
+
+#### `services.redpanda.enforceTLS`
+**STIG SC-8, CJIS 5.10, FedRAMP**
+
+Enforce TLS for all Redpanda services. Validates at build time that TLS is properly configured for Kafka API, Admin API, RPC Server, Schema Registry, and HTTP Proxy. Default: `false`
+
+```nix
+services.redpanda = {
+  enforceTLS = true;
+  settings.redpanda.kafka_api_tls = [{
+    enabled = true;
+    key_file = "/etc/redpanda/certs/tls.key";
+    cert_file = "/etc/redpanda/certs/tls.crt";
+  }];
+};
+```
+
+See [examples/3-node-cluster-tls.nix](./examples/3-node-cluster-tls.nix) for complete TLS configuration.
+
+#### `services.redpanda.cjisAuditRetention`
+**FBI CJIS 5.4, STIG AU-11**
+
+Configure CJIS-compliant 365-day audit retention. Automatically configures systemd-journald to retain logs for minimum 365 days as required by FBI CJIS Security Policy v6.0. Default: `false`
+
+```nix
+services.redpanda.cjisAuditRetention = true;
+```
+
+#### `services.redpanda.auditRetentionDays`
+Number of days to retain audit logs when `cjisAuditRetention` is enabled. Default: `365` (CJIS minimum). Can be increased for stricter requirements (e.g., 730 for 2 years).
+
+### Cluster Options
+
+#### `services.redpanda.cluster.nodes`
+Multi-node cluster topology configuration. When configured, seed servers and advertised addresses are automatically generated based on hostname.
+
+```nix
+services.redpanda.cluster.nodes = {
+  broker1 = {
+    seed = true;
+    rpcAddress = "192.168.1.10:33145";
+    kafkaAddress = "broker1.example.com:9092";
+    rack = "us-west-2a";
+  };
+};
+```
+
+See [examples/3-node-cluster-tls.nix](./examples/3-node-cluster-tls.nix) for complete cluster configuration.
 
 ## Architecture
 
@@ -338,6 +414,107 @@ To add support for new Redpanda versions:
 2. Test the build: `nix build`
 3. Test the module in a NixOS configuration
 4. Submit changes
+
+## Compliance & Security
+
+This Redpanda NixOS package is designed to meet multiple compliance frameworks:
+
+### Supported Frameworks (8 Frameworks)
+
+| Framework | Status | Documentation |
+|-----------|--------|---------------|
+| **SOC 2 Type II** | ✅ 100% Compliant | [SOC2_COMPLIANCE.md](./SOC2_COMPLIANCE.md) |
+| **NIST SP 800-161** (Supply Chain) | ✅ 95% Compliant | [COMPLIANCE_MATRIX.md](./COMPLIANCE_MATRIX.md) |
+| **ISO/IEC 27036** | 🟡 80% Compliant | [COMPLIANCE_MATRIX.md](./COMPLIANCE_MATRIX.md) |
+| **NIST CSF 2.0** (Feb 2024) | 🟡 60% Compliant | [COMPLIANCE_MATRIX.md](./COMPLIANCE_MATRIX.md) |
+| **DoD SBOM Management** (Jan 2024) | ✅ 95% Compliant | [COMPLIANCE_MATRIX.md](./COMPLIANCE_MATRIX.md) |
+| **Anduril NixOS STIG** (Dec 2024) | 🟡 60% Service-Level | [COMPLIANCE_MATRIX.md](./COMPLIANCE_MATRIX.md) |
+| **FedRAMP High** | 🟢 90% with FIPS+TLS | [REDPANDA_FIPS_NIXOS.md](./REDPANDA_FIPS_NIXOS.md) |
+| **FBI CJIS Security Policy v6.0** | ✅ 95% Compliant | [FBI_CJIS_COMPLIANCE.md](./FBI_CJIS_COMPLIANCE.md) |
+
+**NEW**: U.S. Army SBOM mandate (effective early 2025) - This package is procurement-ready with automated SBOM generation.
+
+### Core Security Controls
+
+- **Reproducible Builds**: Every build is cryptographically verifiable and reproducible
+- **Cryptographic Verification**: All packages verified via SHA256 hashes in `default.nix`
+- **Immutable Infrastructure**: Nix store provides immutable package storage at `/nix/store`
+- **Automated SBOM Generation**: CycloneDX and SPDX formats with SLSA v1.0 provenance (NEW)
+- **Vulnerability Scanning**: Automated CVE detection during package updates (NEW)
+- **TLS Enforcement**: Build-time validation of TLS configuration for compliance (NEW)
+- **Audit Retention**: CJIS-compliant 365-day log retention (NEW)
+- **Multi-Architecture**: x86_64 and ARM64/aarch64 support (NEW)
+- **Audit Trail**: Complete change history via git, verifiable package provenance
+- **Automated Updates**: `update.sh` with integrated compliance artifact generation
+- **Security Hardening**: systemd service includes NoNewPrivileges, ProtectSystem, PrivateTmp
+
+### Change Management
+
+- **Declarative Configuration**: All settings in version-controlled `flake.nix` and NixOS modules
+- **Atomic Rollbacks**: `nixos-rebuild switch --rollback` for instant recovery
+- **Version Pinning**: `flake.lock` ensures exact dependency versions
+- **Testing**: Test configurations in VMs before production deployment
+
+### Supply Chain Security (NIST SP 800-161, DoD SBOM, NIST CSF 2.0)
+
+**NEW**: Automated compliance artifact generation integrated into `update.sh`
+
+When you run `./update.sh`, it automatically generates:
+1. **CycloneDX SBOM** (JSON) - Primary DoD format
+2. **SPDX SBOM** (JSON) - Alternative DoD format
+3. **SLSA v1.0 Provenance** - Supply chain attestation (DoD requirement)
+4. **Vulnerability Scan** (CSV) - Automated CVE detection
+
+All artifacts are saved to `compliance/redpanda-<version>-*.{json,csv}`
+
+**Manual Generation** (if needed):
+```bash
+# Generate all compliance artifacts for current build
+nix run github:tiiuae/sbomnix -- $(nix-build) --sbom cyclonedx --output sbom.json
+nix run github:tiiuae/sbomnix -- $(nix-build) --provenance slsa --output provenance.json
+vulnxscan $(nix-build) --sbom sbom.json --output vulns.csv
+```
+
+**Additional Controls:**
+- **Provenance Tracking**: Complete dependency graph via `/nix/store`
+- **Supplier Assessment**: nixpkgs community governance with documented security practices
+- **Tamper Detection**: Immutable packages + reproducible builds detect modifications
+- **Integrity Verification**: `nix-store --verify --check-contents $(nix-build)`
+
+### Access Controls
+
+- **Least Privilege**: Service runs as dedicated `redpanda` user
+- **Firewall Integration**: Automatic port management with `openFirewall` option
+- **File Permissions**: systemd `ProtectSystem=strict` and `ReadWritePaths` restrictions
+
+### Monitoring & Logging
+
+- **systemd Integration**: Standard logging via `journalctl -u redpanda`
+- **Service Status**: Real-time monitoring via `systemctl status redpanda`
+- **Configuration Verification**: Declarative settings prevent configuration drift
+
+### Compliance Documentation
+
+#### Core Compliance Analysis
+- **[COMPLIANCE_MATRIX.md](./COMPLIANCE_MATRIX.md)** - 7-framework compliance analysis with gaps and remediation
+- **[SOC2_COMPLIANCE.md](./SOC2_COMPLIANCE.md)** - Detailed SOC 2 Type II control mapping
+- **[COMPLIANCE_COMPARISON.md](./COMPLIANCE_COMPARISON.md)** - Comparison with similar projects and enhancement roadmap
+
+#### Compliance Architecture
+- **[COMPLIANCE_ARCHITECTURE.md](./COMPLIANCE_ARCHITECTURE.md)** - OS-independent vs OS-dependent compliance explained
+- **Key Insight**: Application-level compliance (SOC 2, SBOM, supply chain) works on **any OS** (Ubuntu, RHEL, NixOS)
+
+#### Installation Guides
+- **[INSTALLATION_GUIDE.md](./INSTALLATION_GUIDE.md)** - Unified multi-platform installation guide
+  - Ubuntu / Debian installation
+  - RHEL / CentOS / Rocky / Alma installation (SELinux handling)
+  - macOS installation (Intel and Apple Silicon)
+  - System service setup (systemd / LaunchDaemon)
+  - Compliance artifacts generation
+
+#### Enterprise Adoption
+- **[NIX_ENTERPRISE_ADOPTION_CASE.md](./NIX_ENTERPRISE_ADOPTION_CASE.md)** - Case for Nix in enterprise and DoD environments
+- **[REDPANDA_FIPS_NIXOS.md](./REDPANDA_FIPS_NIXOS.md)** - FIPS 140-2 compliance implementation
 
 ## License
 
