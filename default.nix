@@ -56,7 +56,7 @@ stdenv.mkDerivation rec {
     patchelf --set-interpreter "$out/opt/redpanda/lib/ld.so" $out/opt/redpanda/libexec/redpanda
 
     # Create wrapper script
-    cat > $out/bin/redpanda << 'WRAPPEREOF'
+    cat > $out/bin/redpanda << 'INNEREOF'
 #!/usr/bin/env bash
 set -e
 
@@ -68,7 +68,7 @@ REDPANDA_HOME="$(dirname "$SCRIPT_DIR")/opt/redpanda"
 export LD_LIBRARY_PATH="''${REDPANDA_HOME}/lib"
 
 exec -a "$0" "''${REDPANDA_HOME}/libexec/redpanda" "$@"
-WRAPPEREOF
+INNEREOF
     chmod +x $out/bin/redpanda
 
     # Also create the opt/redpanda/bin wrapper for consistency

@@ -60,12 +60,6 @@ jobs:
 
           # Check for required binaries
           test -f ./result/bin/redpanda && echo "✅ redpanda binary found"
-          test -f ./result/bin/rpk && echo "✅ rpk binary found"
-
-      - name: Test rpk version
-        run: |
-          echo "Testing rpk version command..."
-          ./result/bin/rpk version || echo "⚠️ rpk version failed (expected on non-NixOS)"
 
   build-examples:
     name: Test Example Configurations
@@ -162,9 +156,8 @@ jobs:
           REQUIRED_DOCS=(
             "README.md"
             "CLAUDE.md"
-            "DOCUMENTATION_INDEX.md"
-            "COMPLIANCE_MATRIX.md"
             "examples/README.md"
+            "docs/compliance/COMPLIANCE_MATRIX.md"
           )
 
           for doc in "${REQUIRED_DOCS[@]}"; do
@@ -231,7 +224,7 @@ jobs:
             grep '|' | head -n -1 >> $GITHUB_STEP_SUMMARY
 
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Documentation**: See [COMPLIANCE_MATRIX.md](./COMPLIANCE_MATRIX.md) for detailed analysis" >> $GITHUB_STEP_SUMMARY
+          echo "**Documentation**: See [COMPLIANCE_MATRIX.md](./docs/compliance/COMPLIANCE_MATRIX.md) for detailed analysis" >> $GITHUB_STEP_SUMMARY
 
   summary:
     name: CI Summary

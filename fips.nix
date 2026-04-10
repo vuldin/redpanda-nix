@@ -69,6 +69,15 @@ stdenv.mkDerivation rec {
       cp -r deb-contents/opt/redpanda/openssl/* $out/opt/redpanda/openssl/
     fi
 
+    # Fix hardcoded .include path for NixOS
+    # The deb ships openssl.cnf with ".include /opt/redpanda/openssl/fipsmodule.cnf"
+    # but on NixOS the file is at $out/opt/redpanda/openssl/fipsmodule.cnf.
+    # Without this fix, the FIPS provider silently fails to load.
+    if [ -f "$out/opt/redpanda/openssl/openssl.cnf" ]; then
+      sed -i "s|\.include /opt/redpanda/openssl/fipsmodule\.cnf|.include $out/opt/redpanda/openssl/fipsmodule.cnf|g" \
+        "$out/opt/redpanda/openssl/openssl.cnf"
+    fi
+
     # Copy any additional files
     if [ -f "deb-contents/opt/redpanda/RELEASE-DATE.txt" ]; then
       cp deb-contents/opt/redpanda/RELEASE-DATE.txt $out/opt/redpanda/

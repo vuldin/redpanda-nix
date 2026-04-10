@@ -4,13 +4,11 @@
 # Usage:
 #   sudo ./scripts/install.sh                    # build + install default variant
 #   sudo ./scripts/install.sh --variant fips     # build + install FIPS variant
-#   sudo ./scripts/install.sh --variant bazel    # build + install from source
 #   sudo ./scripts/install.sh /nix/store/...     # install from an explicit store path
 #
 # Variants:
 #   redpanda  (default)  Official pre-built binary from Cloudsmith deb
 #   fips                 Base binary + FIPS 140-2 OpenSSL (BoringCrypto)
-#   bazel                Built from source via Bazel
 #
 # Idempotent — safe to re-run after a rebuild to upgrade in place.
 
@@ -26,6 +24,16 @@ fi
 if ! command -v systemctl &>/dev/null; then
   echo "Error: systemd is required. This script does not support non-systemd init systems." >&2
   exit 1
+fi
+
+# sudo strips PATH, so nix may not be found. Check standard install locations.
+if ! command -v nix &>/dev/null; then
+  for p in /nix/var/nix/profiles/default/bin /run/current-system/sw/bin /home/*/.nix-profile/bin; do
+    if [[ -x "$p/nix" ]]; then
+      export PATH="$p:$PATH"
+      break
+    fi
+  done
 fi
 
 # --- Parse arguments ----------------------------------------------------------
@@ -67,16 +75,16 @@ elif [[ -n "$VARIANT" ]]; then
   case "$VARIANT" in
     redpanda|default)  FLAKE_PKG="redpanda" ;;
     fips)              FLAKE_PKG="redpanda-fips" ;;
-    bazel)             FLAKE_PKG="redpanda-bazel" ;;
     *)
       echo "Error: unknown variant '$VARIANT'" >&2
-      echo "Valid variants: redpanda (default), fips, bazel" >&2
+      echo "Valid variants: redpanda (default), fips" >&2
       exit 1
       ;;
   esac
 
+  NIX_FLAGS="--extra-experimental-features nix-command --extra-experimental-features flakes"
   echo "Building .#$FLAKE_PKG..."
-  if ! nix build "$PROJECT_DIR#$FLAKE_PKG" --out-link "$PROJECT_DIR/result" 2>&1; then
+  if ! nix $NIX_FLAGS build "$PROJECT_DIR#$FLAKE_PKG" --out-link "$PROJECT_DIR/result" 2>&1; then
     echo "Error: nix build failed." >&2
     exit 1
   fi
@@ -84,8 +92,9 @@ elif [[ -n "$VARIANT" ]]; then
 else
   # No args — use existing result symlink
   if [[ ! -L "$PROJECT_DIR/result" ]]; then
+    NIX_FLAGS="--extra-experimental-features nix-command --extra-experimental-features flakes"
     echo "No result symlink found. Building default package..."
-    if ! nix build "$PROJECT_DIR" --out-link "$PROJECT_DIR/result" 2>&1; then
+    if ! nix $NIX_FLAGS build "$PROJECT_DIR" --out-link "$PROJECT_DIR/result" 2>&1; then
       echo "Error: nix build failed." >&2
       exit 1
     fi

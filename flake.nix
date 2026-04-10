@@ -37,11 +37,6 @@
             program = "${redpanda}/bin/redpanda";
           };
 
-          rpk = {
-            type = "app";
-            program = "${redpanda}/bin/rpk";
-          };
-
           update = {
             type = "app";
             program = toString (pkgs.writeShellScript "update-redpanda" ''
@@ -57,7 +52,96 @@
             jq
           ];
         };
-      }
+      } // (if system == "x86_64-linux" then {
+        checks = {
+          # Test 1: Redpanda service starts with default config
+          service-starts = pkgs.testers.nixosTest {
+            name = "redpanda-service-starts";
+            nodes.machine = { ... }: {
+              imports = [ self.nixosModules.default ];
+              services.redpanda.enable = true;
+              virtualisation.memorySize = 2048;
+            };
+            testScript = ''
+              machine.wait_for_unit("redpanda.service")
+              machine.succeed("systemctl is-active redpanda.service")
+            '';
+          };
+
+          # Test 2: enforceTLS assertion fires when TLS is not configured
+          enforce-tls-assertion = let
+            # Evaluate the module with enforceTLS but no TLS config
+            eval = nixpkgs.lib.nixosSystem {
+              inherit system;
+              modules = [
+                self.nixosModules.default
+                {
+                  services.redpanda = {
+                    enable = true;
+                    enforceTLS = true;
+                    # No TLS config — assertions should fire
+                  };
+                  # Minimal config to allow evaluation
+                  fileSystems."/" = { device = "/dev/sda1"; fsType = "ext4"; };
+                  boot.loader.grub.device = "/dev/sda";
+                }
+              ];
+            };
+            failedAssertions = builtins.filter (a: !a.assertion) eval.config.assertions;
+          in pkgs.runCommand "enforce-tls-assertion-test" {} ''
+            ${if (builtins.length failedAssertions) > 0
+              then ''echo "PASS: enforceTLS correctly produced ${toString (builtins.length failedAssertions)} assertion failure(s)"''
+              else ''echo "FAIL: enforceTLS did not fire any assertions" && exit 1''
+            }
+            touch $out
+          '';
+
+          # Test 3: CJIS audit retention configures journald
+          cjis-retention = pkgs.testers.nixosTest {
+            name = "redpanda-cjis-retention";
+            nodes.machine = { ... }: {
+              imports = [ self.nixosModules.default ];
+              services.redpanda = {
+                enable = true;
+                cjisAuditRetention = true;
+              };
+              virtualisation.memorySize = 2048;
+            };
+            testScript = ''
+              machine.wait_for_unit("multi-user.target")
+              machine.succeed(
+                  "grep -r 'MaxRetentionSec' /etc/systemd/journald.conf.d/ "
+                  "|| grep 'MaxRetentionSec' /etc/systemd/journald.conf"
+              )
+            '';
+          };
+
+          # Test 4: FIPS openssl.cnf references correct Nix store path
+          fips-openssl-path = pkgs.runCommand "fips-openssl-path-test" {} ''
+            if [ -f "${redpanda-fips}/opt/redpanda/openssl/openssl.cnf" ]; then
+              if grep -q '/nix/store/' "${redpanda-fips}/opt/redpanda/openssl/openssl.cnf"; then
+                echo "PASS: openssl.cnf references /nix/store/ path"
+              else
+                echo "FAIL: openssl.cnf does not reference /nix/store/ path"
+                grep '\.include' "${redpanda-fips}/opt/redpanda/openssl/openssl.cnf" || true
+                exit 1
+              fi
+
+              # Verify the target fipsmodule.cnf exists
+              INCLUDE_PATH=$(grep '\.include' "${redpanda-fips}/opt/redpanda/openssl/openssl.cnf" | sed 's/.*\.include //')
+              if [ -f "$INCLUDE_PATH" ]; then
+                echo "PASS: fipsmodule.cnf exists at referenced path"
+              else
+                echo "FAIL: fipsmodule.cnf not found at $INCLUDE_PATH"
+                exit 1
+              fi
+            else
+              echo "SKIP: No openssl.cnf in FIPS package (FIPS supplement may not include it)"
+            fi
+            touch $out
+          '';
+        };
+      } else {})
     ) // {
       # NixOS module
       nixosModules.default = { config, lib, pkgs, ... }:

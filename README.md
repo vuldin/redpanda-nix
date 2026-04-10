@@ -11,7 +11,6 @@ Automated Redpanda packaging for NixOS with automatic version updates, multi-fra
 
 - **Pre-built packages** from official Redpanda deb packages (5-10 min install)
 - **FIPS 140-2 variant** with BoringCrypto for FedRAMP High deployments
-- **Bazel source builds** for development and supply chain verification
 - **Version pinning** to tagged stable releases only (e.g., `v26.1.2`)
 - **Nix flakes** for reproducible, declarative builds
 
@@ -74,7 +73,7 @@ To use a different variant, set `services.redpanda.package`:
 { pkgs, inputs, ... }: {
   services.redpanda = {
     enable = true;
-    package = inputs.redpanda.packages.${pkgs.system}.redpanda-fips;  # or redpanda-bazel
+    package = inputs.redpanda.packages.${pkgs.system}.redpanda-fips;
   };
 }
 ```
@@ -96,8 +95,7 @@ This builds Redpanda, creates a `redpanda` system user, installs a default confi
 To install a different variant:
 
 ```bash
-sudo ./scripts/install.sh --variant fips   # FIPS 140-2
-sudo ./scripts/install.sh --variant bazel  # source build
+sudo ./scripts/install.sh --variant fips
 ```
 
 To upgrade after pulling new changes:
@@ -119,9 +117,6 @@ sudo ./scripts/uninstall.sh --purge  # removes everything
 |---------|-----------|-------------|-------------|
 | `redpanda` (default) | 5-10 min | Official pre-built binary from Cloudsmith deb | Production and development for most users |
 | `fips` | 5-10 min | Base binary + FIPS 140-2 OpenSSL overlay (BoringCrypto) | FedRAMP High, DoD IL4+, CJIS, or any environment requiring FIPS-validated cryptography |
-| `bazel` | 30-60 min | Built from source via Bazel | Redpanda employees, custom patches, supply chain verification, full SBOM generation |
-
-Not sure which to use? See [docs/WHICH_BUILD.md](./docs/WHICH_BUILD.md).
 
 ## Configuration
 
@@ -258,18 +253,18 @@ scripts/update.sh -> default.nix -> flake.nix -> NixOS module
 
 ## Compliance
 
-This package targets 8 compliance frameworks with an average of 91% compliance:
+This package targets 8 compliance frameworks. Percentages reflect implemented, verifiable controls as of 2026-04-09. See [docs/compliance/COMPLIANCE_MATRIX.md](./docs/compliance/COMPLIANCE_MATRIX.md) for detailed gap analysis.
 
-| Framework | Status |
-|-----------|--------|
-| SOC 2 Type II | 100% Compliant |
-| NIST SP 800-161 (Supply Chain) | 100% Compliant |
-| DoD SBOM Management (Jan 2024) | 100% Compliant |
-| FBI CJIS Security Policy v6.0 | 99% Compliant |
-| FedRAMP High | 90% with FIPS+TLS |
-| ISO/IEC 27036 | 80% Compliant |
-| NIST CSF 2.0 (Feb 2024) | 70% Compliant |
-| Anduril NixOS STIG (Dec 2024) | 60% Service-Level |
+| Framework | Implemented | Key Gap |
+|-----------|-------------|---------|
+| SOC 2 Type II | ~90% | No automated audit evidence collection |
+| FBI CJIS Security Policy v6.0 | ~80% | MFA enforcement is application-dependent |
+| NIST SP 800-161 (Supply Chain) | ~70% | SBOM tooling requires running update.sh |
+| ISO/IEC 27036 | ~60% | No formal supplier agreements |
+| FedRAMP High | ~55% | 3PAO assessment and SSP required |
+| DoD SBOM Management (Jan 2024) | ~50% | SBOM artifacts generated on update, not shipped |
+| NIST CSF 2.0 (Feb 2024) | ~50% | No incident response plan |
+| Anduril NixOS STIG (Dec 2024) | ~45% | No structured audit logging |
 
 Key controls: reproducible builds, SHA256 verification, immutable `/nix/store`, automated SBOM (CycloneDX/SPDX), SLSA v1.0 provenance, systemd hardening, TLS enforcement, 365-day audit retention.
 

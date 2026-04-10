@@ -104,7 +104,7 @@ jobs:
 
       - name: Commit changes
         run: |
-          git add default.nix flake.nix compliance/
+          git add default.nix fips.nix flake.nix compliance/
           git commit -m "Update Redpanda to v${{ needs.check-update.outputs.new_version }}
 
           Automated update from ${{ needs.check-update.outputs.current_version }} to ${{ needs.check-update.outputs.new_version }}

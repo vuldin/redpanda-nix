@@ -1,3 +1,4 @@
-{"timestamp":"2025-10-11T02:18:14Z","event":"version_update_started","version":"25.2.8","status":"in_progress","details":"Updating from previous version"}
-{"timestamp":"2025-10-11T02:18:15Z","event":"package_generated","version":"25.2.8","status":"success","details":"Multi-arch package (x86_64 + aarch64)"}
-{"timestamp":"2025-10-11T02:18:15Z","event":"compliance_generation_started","version":"25.2.8","status":"in_progress","details":"Generating SBOM, provenance, and vulnerability scan"}
+{"timestamp":"2026-04-10T03:51:29Z","event":"version_update_started","version":"26.1.2","status":"in_progress","details":"Updating from previous version"}
+{"timestamp":"2026-04-10T03:51:32Z","event":"package_generated","version":"26.1.2","status":"success","details":"DEB package from Cloudsmith (x86_64)"}
+{"timestamp":"2026-04-10T03:51:33Z","event":"fips_package_generated","version":"26.1.2","status":"success","details":"FIPS supplement DEB from Cloudsmith (x86_64)"}
+{"timestamp":"2026-04-10T03:51:33Z","event":"compliance_generation_started","version":"26.1.2","status":"in_progress","details":"Generating SBOM, provenance, and vulnerability scan"}
