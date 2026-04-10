@@ -255,7 +255,7 @@ scripts/update.sh -> default.nix -> flake.nix -> Nix package + NixOS module
 
 ## Compliance
 
-This package targets 8 compliance frameworks. Percentages reflect implemented, verifiable controls as of 2026-04-10. See [docs/compliance/COMPLIANCE_MATRIX.md](./docs/compliance/COMPLIANCE_MATRIX.md) for detailed gap analysis.
+This package targets 8 compliance frameworks. Percentages reflect implemented, verifiable controls as of 2026-04-10. See [compliance/COMPLIANCE_MATRIX.md](./compliance/COMPLIANCE_MATRIX.md) for detailed gap analysis.
 
 | Framework | Implemented | Key Gap |
 |-----------|-------------|---------|

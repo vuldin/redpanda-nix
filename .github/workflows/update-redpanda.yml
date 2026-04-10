@@ -168,7 +168,7 @@ jobs:
 
           ### Compliance Status
 
-          Compliance status (see docs/compliance/COMPLIANCE_MATRIX.md):
+          Compliance status (see compliance/COMPLIANCE_MATRIX.md):
           - SOC 2 Type II (~90%)
           - FBI CJIS v6.0 (~80%)
           - NIST SP 800-161 (~70%)

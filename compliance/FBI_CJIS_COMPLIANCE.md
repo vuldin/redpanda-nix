@@ -120,13 +120,13 @@ The CJIS Security Policy v6.0 has **13 key policy areas**:
 
 | CJIS Policy Area | Relevant to App Package? | Status | Implementation |
 |-----------------|-------------------------|--------|----------------|
-| **5.4 Auditing** | ✅ Yes | 🟡 Partial | systemd journal (needs structured logging) |
-| **5.5 Access Control** | ✅ Yes | ✅ Implemented | Least privilege, systemd hardening |
-| **5.6 Authentication** | ⚠️ App-specific | N/A | Redpanda internal auth (SASL, mTLS) |
-| **5.7 Config Management** | ✅ Yes | ✅ Implemented | Declarative Nix, git-based |
-| **5.10 Encryption** | ✅ Yes | 🟡 Partial | TLS available, FIPS mode supported |
-| **5.11 Integrity** | ✅ Yes | ✅ Implemented | Reproducible builds, SHA256 verification |
-| **Supply Chain (NEW)** | ✅ Yes | ✅ Implemented | SBOM, provenance, reproducibility |
+| **5.4 Auditing** | Yes | Partial | systemd journal (needs structured logging) |
+| **5.5 Access Control** | Yes | Implemented | Least privilege, systemd hardening |
+| **5.6 Authentication** | App-specific | N/A | Redpanda internal auth (SASL, mTLS) |
+| **5.7 Config Management** | Yes | Implemented | Declarative Nix, git-based |
+| **5.10 Encryption** | Yes | Partial | TLS available, FIPS mode supported |
+| **5.11 Integrity** | Yes | Implemented | Reproducible builds, SHA256 verification |
+| **Supply Chain (NEW)** | Yes | Implemented | SBOM, provenance, reproducibility |
 
 ### Detailed Control Mapping
 
@@ -142,7 +142,7 @@ The CJIS Security Policy v6.0 has **13 key policy areas**:
 | **AU-9** | Protection of Audit Information | systemd protections | Need 365-day retention policy |
 | **AU-11** | Audit Record Retention | Default systemd retention | **Must configure 365+ days** |
 
-**Current Status**: 🟡 **60% Compliant**
+**Current Status**: **60% Compliant**
 
 **Gap**: Need structured audit logging with 365-day retention.
 
@@ -154,12 +154,12 @@ The CJIS Security Policy v6.0 has **13 key policy areas**:
 
 | Control | CJIS Requirement | Current Implementation | Gap |
 |---------|-----------------|----------------------|-----|
-| **AC-2** | Account Management | Dedicated `redpanda` user | ✅ Complete |
-| **AC-3** | Access Enforcement | systemd hardening | ✅ Complete |
-| **AC-6** | Least Privilege | Non-root execution, limited file access | ✅ Complete |
+| **AC-2** | Account Management | Dedicated `redpanda` user | Complete |
+| **AC-3** | Access Enforcement | systemd hardening | Complete |
+| **AC-6** | Least Privilege | Non-root execution, limited file access | Complete |
 | **AC-7** | Unsuccessful Logon Attempts | Redpanda internal | N/A (app-level) |
 
-**Current Status**: ✅ **100% Compliant** (application-level controls)
+**Current Status**: ~90% (application-level controls)
 
 ---
 
@@ -170,10 +170,10 @@ The CJIS Security Policy v6.0 has **13 key policy areas**:
 | Control | CJIS Requirement | Current Implementation | Gap |
 |---------|-----------------|----------------------|-----|
 | **IA-2** | Identification and Authentication | Redpanda SASL, mTLS | N/A (app configuration) |
-| **IA-2(1)** | Multi-Factor Authentication (MFA) | Redpanda supports SASL + mTLS | ⚠️ Must be configured |
+| **IA-2(1)** | Multi-Factor Authentication (MFA) | Redpanda supports SASL + mTLS | Must be configured |
 | **IA-5** | Authenticator Management | Redpanda internal | N/A (app-level) |
 
-**Current Status**: ⚠️ **Application-Dependent** (Redpanda supports MFA, must be configured by admin)
+**Current Status**: **Application-Dependent** (Redpanda supports MFA, must be configured by admin)
 
 **Note**: This is **application-level authentication**, not package-level. Redpanda supports:
 - SASL/SCRAM authentication (username/password)
@@ -188,13 +188,13 @@ The CJIS Security Policy v6.0 has **13 key policy areas**:
 
 | Control | CJIS Requirement | Current Implementation | Gap |
 |---------|-----------------|----------------------|-----|
-| **CM-2** | Baseline Configuration | Declarative `flake.nix` | ✅ Complete |
-| **CM-3** | Configuration Change Control | Git-based version control | ✅ Complete |
-| **CM-6** | Configuration Settings | NixOS module validation | ✅ Complete |
-| **CM-7** | Least Functionality | Minimal package, no unnecessary services | ✅ Complete |
-| **CM-8** | Information System Component Inventory | `flake.lock`, `/nix/store` | ✅ Complete |
+| **CM-2** | Baseline Configuration | Declarative `flake.nix` | Complete |
+| **CM-3** | Configuration Change Control | Git-based version control | Complete |
+| **CM-6** | Configuration Settings | NixOS module validation | Complete |
+| **CM-7** | Least Functionality | Minimal package, no unnecessary services | Complete |
+| **CM-8** | Information System Component Inventory | `flake.lock`, `/nix/store` | Complete |
 
-**Current Status**: ✅ **100% Compliant**
+**Current Status**: ~90%
 
 ---
 
@@ -204,11 +204,11 @@ The CJIS Security Policy v6.0 has **13 key policy areas**:
 
 | Control | CJIS Requirement | Current Implementation | Gap |
 |---------|-----------------|----------------------|-----|
-| **SC-8** | Transmission Confidentiality | TLS available for all listeners | 🟡 Not enforced by default |
-| **SC-13** | Cryptographic Protection | FIPS mode supported | 🟡 Must be enabled |
-| **SC-28** | Protection of Information at Rest | Redpanda encryption at rest | ⚠️ Must be configured |
+| **SC-8** | Transmission Confidentiality | TLS available for all listeners | Not enforced by default |
+| **SC-13** | Cryptographic Protection | FIPS mode supported | Must be enabled |
+| **SC-28** | Protection of Information at Rest | Redpanda encryption at rest | Must be configured |
 
-**Current Status**: 🟡 **70% Compliant** (TLS/FIPS available, not enforced)
+**Current Status**: **70% Compliant** (TLS/FIPS available, not enforced)
 
 **Gap**: Need `enforceTLS` option and FIPS-by-default mode for CJIS deployments.
 
@@ -220,12 +220,12 @@ The CJIS Security Policy v6.0 has **13 key policy areas**:
 
 | Control | CJIS Requirement | Current Implementation | Gap |
 |---------|-----------------|----------------------|-----|
-| **SI-2** | Flaw Remediation | `update.sh` documented process | ✅ Complete |
+| **SI-2** | Flaw Remediation | `update.sh` documented process | Complete |
 | **SI-3** | Malware Protection | Host-level (OS responsibility) | N/A (not app-level) |
-| **SI-7** | Software Integrity | SHA256 verification, reproducible builds | ✅ Complete |
+| **SI-7** | Software Integrity | SHA256 verification, reproducible builds | Complete |
 | **SI-10** | Information Input Validation | Redpanda internal | N/A (app-level) |
 
-**Current Status**: ✅ **100% Compliant** (application-level controls)
+**Current Status**: ~90% (application-level controls)
 
 ---
 
@@ -235,13 +235,13 @@ The CJIS Security Policy v6.0 has **13 key policy areas**:
 
 | Requirement | Current Implementation | Gap |
 |------------|----------------------|-----|
-| **Security Engineering in Procurement** | Reproducible builds, SBOM, provenance | ✅ Complete |
-| **System Documentation** | 14 markdown docs, 250+ pages | ✅ Complete |
-| **Supply Chain Risk Management Plan** | Git audit trail, nixpkgs governance | 🟡 Need formal SCRM doc |
+| **Security Engineering in Procurement** | Reproducible builds, SBOM, provenance | Complete |
+| **System Documentation** | 14 markdown docs, 250+ pages | Complete |
+| **Supply Chain Risk Management Plan** | Git audit trail, nixpkgs governance | Need formal SCRM doc |
 | **Vendor Notification Agreements** | N/A (open source) | N/A |
-| **Component Inspection** | `nix-store --verify`, SBOM scanning | ✅ Complete |
+| **Component Inspection** | `nix-store --verify`, SBOM scanning | Complete |
 
-**Current Status**: ✅ **90% Compliant** (missing formal SCRM policy document)
+**Current Status**: **90% Compliant** (missing formal SCRM policy document)
 
 **Strength**: This package's reproducible builds and SBOM generation directly address CJIS v6.0's new supply chain requirements.
 
@@ -253,10 +253,10 @@ The CJIS Security Policy v6.0 has **13 key policy areas**:
 
 | Gap | CJIS Requirement | Severity | Remediation | Effort |
 |-----|----------------|----------|-------------|--------|
-| **365-day audit retention** | 5.4 (AU-11) | 🔴 Critical | Configure systemd journal retention | Low (1 day) |
-| **MFA enforcement** | 5.6 (IA-2) | 🔴 Critical | Configure Redpanda SASL + mTLS | Medium (app config) |
-| **FIPS 140-3 encryption** | 5.10 (SC-13) | 🔴 Critical | Enable FIPS mode (see REDPANDA_FIPS_NIXOS.md) | Medium (2-3 days) |
-| **Structured audit logging** | 5.4 (AU-3) | 🟡 High | Add JSON audit log format | Medium (3 days) |
+| **365-day audit retention** | 5.4 (AU-11) | Critical | Configure systemd journal retention | Low (1 day) |
+| **MFA enforcement** | 5.6 (IA-2) | Critical | Configure Redpanda SASL + mTLS | Medium (app config) |
+| **FIPS 140-3 encryption** | 5.10 (SC-13) | Critical | Enable FIPS mode (see REDPANDA_FIPS_NIXOS.md) | Medium (2-3 days) |
+| **Structured audit logging** | 5.4 (AU-3) | High | Add JSON audit log format | Medium (3 days) |
 
 ### High-Priority Gaps (Required for Full Compliance)
 
@@ -473,7 +473,7 @@ sbomnix $(nix-build default.nix) --provenance slsa --output cjis-evidence/proven
 # Package for CJIS audit
 tar czf cjis-compliance-evidence-$(date +%Y%m%d).tar.gz cjis-evidence/
 
-echo "✅ CJIS compliance evidence package created"
+echo "CJIS compliance evidence package created"
 ```
 
 ---
@@ -512,19 +512,19 @@ echo "✅ CJIS compliance evidence package created"
 **Scenario**: State police agency wants to stream NCIC queries/responses through Redpanda for real-time analytics.
 
 **CJIS Requirements**:
-1. ✅ FIPS 140-3 encryption (enable FIPS mode)
-2. ✅ MFA for all users accessing CJI (SASL + mTLS)
-3. ✅ 365-day audit logs (configure systemd retention)
-4. ✅ Background checks for personnel (organizational policy)
-5. ✅ Physical security (data center compliance)
-6. ✅ Information Exchange Agreement with FBI
+1. FIPS 140-3 encryption (enable FIPS mode)
+2. MFA for all users accessing CJI (SASL + mTLS)
+3. 365-day audit logs (configure systemd retention)
+4. Background checks for personnel (organizational policy)
+5. Physical security (data center compliance)
+6. Information Exchange Agreement with FBI
 
 **Redpanda NixOS Package Compliance**:
-- ✅ Reproducible builds (supply chain security)
-- ✅ SBOM generation (component inventory)
-- ✅ FIPS mode supported (cryptographic protection)
-- ✅ Declarative config (change control)
-- ✅ Git audit trail (configuration management)
+- Reproducible builds (supply chain security)
+- SBOM generation (component inventory)
+- FIPS mode supported (cryptographic protection)
+- Declarative config (change control)
+- Git audit trail (configuration management)
 
 **Result**: This package provides 80-90% of CJIS technical controls. Remaining 10-20% are organizational policies (training, background checks, physical security).
 
@@ -536,13 +536,13 @@ echo "✅ CJIS compliance evidence package created"
 
 | CJIS Policy Area | Score | Status |
 |-----------------|-------|--------|
-| 5.4 Auditing | 60% | 🟡 Needs 365-day retention |
-| 5.5 Access Control | 100% | ✅ Complete |
-| 5.6 Authentication | N/A | ⚠️ App configuration |
-| 5.7 Config Management | 100% | ✅ Complete |
-| 5.10 Encryption | 70% | 🟡 FIPS available, not enforced |
-| 5.11 System Integrity | 100% | ✅ Complete |
-| Supply Chain (NEW) | 90% | 🟡 Need formal SCRM doc |
+| 5.4 Auditing | 60% | Needs 365-day retention |
+| 5.5 Access Control | 100% | Complete |
+| 5.6 Authentication | N/A | App configuration |
+| 5.7 Config Management | 100% | Complete |
+| 5.10 Encryption | 70% | FIPS available, not enforced |
+| 5.11 System Integrity | 100% | Complete |
+| Supply Chain (NEW) | 90% | Need formal SCRM doc |
 
 **Current Compliance**: **80% (Application-Level Technical Controls)**
 

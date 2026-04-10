@@ -92,9 +92,9 @@ This document defines the Cybersecurity Supply Chain Risk Management (C-SCRM) pr
 **Storage Location**: `compliance/redpanda-{version}-sbom.json`
 
 **Compliance**:
-- ✅ DoD SBOM Management Requirement 1
-- ✅ NIST 800-161 SR-3a
-- ✅ U.S. Army SBOM Mandate (2025)
+- DoD SBOM Management Requirement 1
+- NIST 800-161 SR-3a
+- U.S. Army SBOM Mandate (2025)
 
 ### 3.2 Provenance Tracking (SR-3b, SR-4)
 
@@ -116,8 +116,8 @@ jq '.predicate' compliance/redpanda-*-provenance.json
 ```
 
 **Compliance**:
-- ✅ NIST 800-161 SR-4
-- ✅ SLSA Build L2
+- NIST 800-161 SR-4
+- SLSA Build L2
 
 ### 3.3 Vulnerability Scanning (SR-3c, SR-10)
 
@@ -141,9 +141,9 @@ jq '.predicate' compliance/redpanda-*-provenance.json
 **Storage**: `compliance/redpanda-{version}-vulnerabilities.csv`
 
 **Compliance**:
-- ✅ NIST 800-161 SR-10
-- ✅ NIST CSF 2.0 GV.SC-10
-- ✅ DoD SBOM Requirement 5
+- NIST 800-161 SR-10
+- NIST CSF 2.0 GV.SC-10
+- DoD SBOM Requirement 5
 
 ### 3.4 Integrity Verification (SR-9, SR-11)
 
@@ -167,8 +167,8 @@ cosign verify-blob \
 ```
 
 **Compliance**:
-- ✅ NIST 800-161 SR-9 (Tamper Resistance)
-- ✅ NIST 800-161 SR-11 (Component Authenticity)
+- NIST 800-161 SR-9 (Tamper Resistance)
+- NIST 800-161 SR-11 (Component Authenticity)
 
 ---
 
@@ -192,11 +192,11 @@ cosign verify-blob \
 5. Vulnerability patching SLA
 
 **nixpkgs Compliance**:
-- ✅ Community governance model
-- ✅ Multi-maintainer code review
-- ✅ Automated testing (Hydra CI)
-- ✅ CVE tracking via NixOS Security Team
-- ✅ Reproducible builds
+- Community governance model
+- Multi-maintainer code review
+- Automated testing (Hydra CI)
+- CVE tracking via NixOS Security Team
+- Reproducible builds
 
 ### 4.3 Supplier Monitoring
 
@@ -320,18 +320,18 @@ nix-store --verify --check-contents $(nix-build)
 
 | Control | Requirement | Implementation | Status |
 |---------|-------------|----------------|--------|
-| **SR-1** | Supply chain risk management policy | This document | ✅ Complete |
-| **SR-2** | Supply chain risk assessments | Section 2 | ✅ Complete |
-| **SR-3** | Supply chain controls | Section 3 | ✅ Complete |
-| **SR-4** | Provenance | SLSA attestation | ✅ Complete |
-| **SR-5** | Supplier reviews | SUPPLIER_ASSESSMENT.md | ✅ Complete |
-| **SR-6** | Test and evaluation | CI/CD testing | ✅ Complete |
-| **SR-7** | Supply chain coordination | Event logging | ✅ Complete |
-| **SR-8** | Notification agreements | GitHub issues | ✅ Complete |
-| **SR-9** | Tamper resistance | Immutable /nix/store | ✅ Complete |
-| **SR-10** | Inspection of systems/components | vulnxscan | ✅ Complete |
-| **SR-11** | Component authenticity | SHA256, reproducible builds | ✅ Complete |
-| **SR-12** | Data integrity protection | Cryptographic verification | ✅ Complete |
+| **SR-1** | Supply chain risk management policy | This document | Complete |
+| **SR-2** | Supply chain risk assessments | Section 2 | Complete |
+| **SR-3** | Supply chain controls | Section 3 | Complete |
+| **SR-4** | Provenance | SLSA attestation | Complete |
+| **SR-5** | Supplier reviews | SUPPLIER_ASSESSMENT.md | Complete |
+| **SR-6** | Test and evaluation | CI/CD testing | Complete |
+| **SR-7** | Supply chain coordination | Event logging | Complete |
+| **SR-8** | Notification agreements | GitHub issues | Complete |
+| **SR-9** | Tamper resistance | Immutable /nix/store | Complete |
+| **SR-10** | Inspection of systems/components | vulnxscan | Complete |
+| **SR-11** | Component authenticity | SHA256, reproducible builds | Complete |
+| **SR-12** | Data integrity protection | Cryptographic verification | Complete |
 
 **Result**: ~70% Implemented. Tooling and controls exist; SBOM/provenance artifacts require running `scripts/update.sh` per version.
 
@@ -339,12 +339,12 @@ nix-store --verify --check-contents $(nix-build)
 
 | Requirement | Implementation | Status |
 |-------------|----------------|--------|
-| **Req 1**: SBOM Format (CycloneDX/SPDX) | Both formats | ✅ Complete |
-| **Req 2**: SBOM Enrichment | Component details, licenses, CVEs | ✅ Complete |
-| **Req 3**: Hash Capture | SHA256 in /nix/store | ✅ Complete |
-| **Req 4**: SBOM Aggregation | aggregate-sboms.sh | ✅ Complete |
-| **Req 5**: Vulnerability Alerting | GitHub issues | ✅ Complete |
-| **Req 6**: Provenance Tracking | SLSA v1.0 | ✅ Complete |
+| **Req 1**: SBOM Format (CycloneDX/SPDX) | Both formats | Complete |
+| **Req 2**: SBOM Enrichment | Component details, licenses, CVEs | Complete |
+| **Req 3**: Hash Capture | SHA256 in /nix/store | Complete |
+| **Req 4**: SBOM Aggregation | aggregate-sboms.sh | Complete |
+| **Req 5**: Vulnerability Alerting | GitHub issues | Complete |
+| **Req 6**: Provenance Tracking | SLSA v1.0 | Complete |
 
 **Result**: ~50% Implemented. Scripts generate SBOMs on update but artifacts are gitignored and not shipped with releases.
 
@@ -352,11 +352,11 @@ nix-store --verify --check-contents $(nix-build)
 
 | Control | Requirement | Implementation | Status |
 |---------|-------------|----------------|--------|
-| **5.2.1** | Security engineering | This C-SCRM plan | ✅ Complete |
-| **5.2.2** | Supply chain risk management | Section 2 | ✅ Complete |
-| **5.2.3** | Component inspection | vulnxscan, nix-store verify | ✅ Complete |
+| **5.2.1** | Security engineering | This C-SCRM plan | Complete |
+| **5.2.2** | Supply chain risk management | Section 2 | Complete |
+| **5.2.3** | Component inspection | vulnxscan, nix-store verify | Complete |
 
-**Result**: ✅ Compliant with CJIS Supply Chain Requirements
+**Result**: Compliant with CJIS Supply Chain Requirements
 
 ---
 

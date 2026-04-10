@@ -282,7 +282,7 @@ This project is designed to meet multiple compliance frameworks:
 
 ### Compliance Status
 
-Percentages reflect implemented, verifiable controls as of 2026-04-10. See [COMPLIANCE_MATRIX.md](./docs/compliance/COMPLIANCE_MATRIX.md) for detailed gap analysis.
+Percentages reflect implemented, verifiable controls as of 2026-04-10. See [COMPLIANCE_MATRIX.md](./compliance/COMPLIANCE_MATRIX.md) for detailed gap analysis.
 
 | Framework | Implemented | Key Gap |
 |-----------|-------------|---------|
@@ -305,9 +305,9 @@ Percentages reflect implemented, verifiable controls as of 2026-04-10. See [COMP
 7. Supplier Security Assessment (NIST 800-161 SR-5, ISO 27036)
 
 **Key Documentation**:
-- **[COMPLIANCE_MATRIX.md](./docs/compliance/COMPLIANCE_MATRIX.md)** - Master compliance analysis (7 frameworks, architecture, ROI)
-- **[C-SCRM_PLAN.md](./docs/compliance/C-SCRM_PLAN.md)** - C-SCRM implementation plan (NIST 800-161)
-- **[SUPPLIER_ASSESSMENT.md](./docs/compliance/SUPPLIER_ASSESSMENT.md)** - Security assessment of all suppliers
+- **[COMPLIANCE_MATRIX.md](./compliance/COMPLIANCE_MATRIX.md)** - Master compliance analysis (7 frameworks, architecture, ROI)
+- **[C-SCRM_PLAN.md](./compliance/C-SCRM_PLAN.md)** - C-SCRM implementation plan (NIST 800-161)
+- **[SUPPLIER_ASSESSMENT.md](./compliance/SUPPLIER_ASSESSMENT.md)** - Security assessment of all suppliers
 
 ### SOC 2 Type II Compliance (✅ Complete)
 
@@ -362,8 +362,8 @@ nix run github:nikstur/bombon -- $(nix-build default.nix)
 **Recommendation**: Use **sbomnix** for DoD/NIST compliance (SLSA provenance + CVE scanning).
 
 **✅ All Gaps Resolved**:
-- ✅ Formal C-SCRM implementation plan: [C-SCRM_PLAN.md](./docs/compliance/C-SCRM_PLAN.md)
-- ✅ Documented supplier assessment: [SUPPLIER_ASSESSMENT.md](./docs/compliance/SUPPLIER_ASSESSMENT.md)
+- ✅ Formal C-SCRM implementation plan: [C-SCRM_PLAN.md](./compliance/C-SCRM_PLAN.md)
+- ✅ Documented supplier assessment: [SUPPLIER_ASSESSMENT.md](./compliance/SUPPLIER_ASSESSMENT.md)
 - ✅ SBOM generation automated: Integrated in `scripts/update.sh` with event logging
 
 ### ISO/IEC 27036 Compliance (🟡 80%)
@@ -376,7 +376,7 @@ nix run github:nikstur/bombon -- $(nix-build default.nix)
 - **Clause 7.2 - Managing Changes**: Git-based change control
 
 **Addressed**:
-- ✅ Supplier Security Requirements: [SUPPLIER_ASSESSMENT.md](./docs/compliance/SUPPLIER_ASSESSMENT.md)
+- ✅ Supplier Security Requirements: [SUPPLIER_ASSESSMENT.md](./compliance/SUPPLIER_ASSESSMENT.md)
 - ✅ Supplier Relationship Management: Documented in supplier assessment
 - ✅ Continuous Monitoring: Automated via GitHub Actions
 
@@ -405,7 +405,7 @@ nix run github:nikstur/bombon -- $(nix-build default.nix)
 **Enhanced (70% → 70%)**:
 - ✅ GV.SC-05: Supply chain event logging implemented
 - ✅ GV.SC-10: Automated CVE monitoring operational
-- ❌ GV.SC-07: Incident response plan (remains gap - see [C-SCRM_PLAN.md §6](./docs/compliance/C-SCRM_PLAN.md) for procedures)
+- ❌ GV.SC-07: Incident response plan (remains gap - see [C-SCRM_PLAN.md §6](./compliance/C-SCRM_PLAN.md) for procedures)
 
 ### DoD SBOM Management (🟡 70% - NSA Jan 2024 Guidance)
 
@@ -423,7 +423,7 @@ nix run github:nikstur/bombon -- $(nix-build default.nix)
 **Tooling available (~50% implemented)**:
 1. SLSA provenance generation: Available via `scripts/update.sh` (must be run)
 2. Vulnerability scanning: Available via sbomnix vulnxscan (must be run)
-3. SBOM enrichment: Documented in [C-SCRM_PLAN.md](./docs/compliance/C-SCRM_PLAN.md)
+3. SBOM enrichment: Documented in [C-SCRM_PLAN.md](./compliance/C-SCRM_PLAN.md)
 4. SBOM signing: Sigstore/cosign integration available (must be run)
 
 Note: SBOM artifacts are generated when `scripts/update.sh` runs but are gitignored. They are not shipped with the package.
@@ -461,8 +461,8 @@ Note: SBOM artifacts are generated when `scripts/update.sh` runs but are gitigno
 5. **Timeline**: 18-24 months to achieve ATO (Authority to Operate)
 
 **See Compliance Documentation**:
-- [COMPLIANCE_MATRIX.md](./docs/compliance/COMPLIANCE_MATRIX.md) - Detailed gap analysis across all frameworks
-- [C-SCRM_PLAN.md](./docs/compliance/C-SCRM_PLAN.md) - NIST SP 800-161 implementation plan
+- [COMPLIANCE_MATRIX.md](./compliance/COMPLIANCE_MATRIX.md) - Detailed gap analysis across all frameworks
+- [C-SCRM_PLAN.md](./compliance/C-SCRM_PLAN.md) - NIST SP 800-161 implementation plan
 
 ### Change Control Process
 1. All changes committed to git (audit trail)
@@ -600,10 +600,10 @@ Add a final step to `update-redpanda.yml`:
 - [Nix Flakes](https://nixos.wiki/wiki/Flakes) - Flake format and usage
 
 ### Internal Documentation
-- [COMPLIANCE_MATRIX.md](./docs/compliance/COMPLIANCE_MATRIX.md) - Master compliance analysis (7 frameworks, architecture, ROI)
-- [C-SCRM_PLAN.md](./docs/compliance/C-SCRM_PLAN.md) - NIST SP 800-161 implementation
-- [SUPPLIER_ASSESSMENT.md](./docs/compliance/SUPPLIER_ASSESSMENT.md) - Supplier security assessment
-- [SOC2_COMPLIANCE.md](./docs/compliance/SOC2_COMPLIANCE.md) - SOC 2 Type II control mapping
-- [FBI_CJIS_COMPLIANCE.md](./docs/compliance/FBI_CJIS_COMPLIANCE.md) - CJIS Security Policy analysis
+- [COMPLIANCE_MATRIX.md](./compliance/COMPLIANCE_MATRIX.md) - Master compliance analysis (7 frameworks, architecture, ROI)
+- [C-SCRM_PLAN.md](./compliance/C-SCRM_PLAN.md) - NIST SP 800-161 implementation
+- [SUPPLIER_ASSESSMENT.md](./compliance/SUPPLIER_ASSESSMENT.md) - Supplier security assessment
+- [SOC2_COMPLIANCE.md](./compliance/SOC2_COMPLIANCE.md) - SOC 2 Type II control mapping
+- [FBI_CJIS_COMPLIANCE.md](./compliance/FBI_CJIS_COMPLIANCE.md) - CJIS Security Policy analysis
 - [REDPANDA_FIPS_NIXOS.md](./docs/REDPANDA_FIPS_NIXOS.md) - FIPS 140-2 implementation guide
-- [INCIDENT_RESPONSE_PLAN.md](./docs/compliance/INCIDENT_RESPONSE_PLAN.md) - Incident response procedures
+- [INCIDENT_RESPONSE_PLAN.md](./compliance/INCIDENT_RESPONSE_PLAN.md) - Incident response procedures

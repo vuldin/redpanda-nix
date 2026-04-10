@@ -11,7 +11,7 @@
 
 This document assesses the security posture of primary suppliers for the Redpanda NixOS package.
 
-**Assessment Result**: ✅ **All suppliers meet minimum security requirements**
+**Assessment Result**: **All suppliers meet minimum security requirements**
 
 ---
 
@@ -29,16 +29,16 @@ This document assesses the security posture of primary suppliers for the Redpand
 
 | Practice | Implementation | Assessment |
 |----------|----------------|------------|
-| **Code Review** | Multi-maintainer review required | ✅ Strong |
-| **CI/CD Testing** | Hydra CI (automated) | ✅ Strong |
-| **CVE Tracking** | NixOS Security Team | ✅ Adequate |
-| **Vulnerability Response** | Community-driven, <7 days typical | ✅ Good |
-| **Build Reproducibility** | Core feature of Nix | ✅ Excellent |
-| **Cryptographic Verification** | SHA256 for all packages | ✅ Strong |
-| **Access Control** | GitHub + commit permissions | ✅ Adequate |
-| **Supply Chain Security** | Flake.lock pinning | ✅ Strong |
+| **Code Review** | Multi-maintainer review required | Strong |
+| **CI/CD Testing** | Hydra CI (automated) | Strong |
+| **CVE Tracking** | NixOS Security Team | Adequate |
+| **Vulnerability Response** | Community-driven, <7 days typical | Good |
+| **Build Reproducibility** | Core feature of Nix | Excellent |
+| **Cryptographic Verification** | SHA256 for all packages | Strong |
+| **Access Control** | GitHub + commit permissions | Adequate |
+| **Supply Chain Security** | Flake.lock pinning | Strong |
 
-**Overall Rating**: ✅ **TRUSTED**
+**Overall Rating**: **TRUSTED**
 
 ### 1.3 Risk Assessment
 
@@ -77,14 +77,14 @@ This document assesses the security posture of primary suppliers for the Redpand
 
 | Practice | Implementation | Assessment |
 |----------|----------------|------------|
-| **Security Releases** | GitHub releases with SHA256 | ✅ Strong |
-| **CVE Disclosure** | Public security advisories | ✅ Strong |
-| **Code Signing** | GitHub release artifacts | ✅ Adequate |
-| **Vulnerability Patching** | Regular security updates | ✅ Good |
-| **Documentation** | Comprehensive security docs | ✅ Strong |
-| **Enterprise Support** | Commercial support available | ✅ Strong |
+| **Security Releases** | GitHub releases with SHA256 | Strong |
+| **CVE Disclosure** | Public security advisories | Strong |
+| **Code Signing** | GitHub release artifacts | Adequate |
+| **Vulnerability Patching** | Regular security updates | Good |
+| **Documentation** | Comprehensive security docs | Strong |
+| **Enterprise Support** | Commercial support available | Strong |
 
-**Overall Rating**: ✅ **TRUSTED**
+**Overall Rating**: **TRUSTED**
 
 ### 2.3 Supply Chain Controls
 
@@ -112,13 +112,13 @@ This document assesses the security posture of primary suppliers for the Redpand
 
 | Practice | Implementation | Assessment |
 |----------|----------------|------------|
-| **Infrastructure Security** | Microsoft-managed, SOC 2/ISO 27001 certified | ✅ Excellent |
-| **Access Control** | 2FA required, RBAC | ✅ Strong |
-| **Audit Logging** | Complete audit trails | ✅ Strong |
-| **Availability** | 99.9% SLA | ✅ Strong |
-| **Compliance** | SOC 2, ISO 27001, FedRAMP | ✅ Excellent |
+| **Infrastructure Security** | Microsoft-managed, SOC 2/ISO 27001 certified | Excellent |
+| **Access Control** | 2FA required, RBAC | Strong |
+| **Audit Logging** | Complete audit trails | Strong |
+| **Availability** | 99.9% SLA | Strong |
+| **Compliance** | SOC 2, ISO 27001, FedRAMP | Excellent |
 
-**Overall Rating**: ✅ **TRUSTED**
+**Overall Rating**: **TRUSTED**
 
 **Risk Level**: **VERY LOW**
 
@@ -130,20 +130,20 @@ This document assesses the security posture of primary suppliers for the Redpand
 
 All suppliers must meet:
 
-1. ✅ **CVE Tracking**: Documented vulnerability disclosure process
-2. ✅ **Incident Notification**: Security incidents reported within 24-48 hours
-3. ✅ **Change Management**: Documented change control procedures
-4. ✅ **Code Review**: Multi-person review for changes
-5. ✅ **Testing**: Automated testing before release
-6. ✅ **Cryptographic Verification**: SHA256 or equivalent for all artifacts
+1. **CVE Tracking**: Documented vulnerability disclosure process
+2. **Incident Notification**: Security incidents reported within 24-48 hours
+3. **Change Management**: Documented change control procedures
+4. **Code Review**: Multi-person review for changes
+5. **Testing**: Automated testing before release
+6. **Cryptographic Verification**: SHA256 or equivalent for all artifacts
 
 ### 4.2 Compliance Status
 
 | Supplier | Requirements Met | Status |
 |----------|------------------|--------|
-| **nixpkgs** | 6/6 | ✅ Compliant |
-| **Redpanda Data** | 6/6 | ✅ Compliant |
-| **GitHub** | 6/6 | ✅ Compliant |
+| **nixpkgs** | 6/6 | Compliant |
+| **Redpanda Data** | 6/6 | Compliant |
+| **GitHub** | 6/6 | Compliant |
 
 ---
 
@@ -243,24 +243,24 @@ All supplier-related events logged to:
 
 | Requirement | Implementation | Status |
 |-------------|----------------|--------|
-| **Supplier identification** | Section 1-3 | ✅ Complete |
-| **Security assessment** | Section 1.2, 2.2 | ✅ Complete |
-| **Risk evaluation** | Section 1.3, 2.3 | ✅ Complete |
-| **Minimum requirements** | Section 4 | ✅ Complete |
-| **Continuous monitoring** | Section 5 | ✅ Complete |
+| **Supplier identification** | Section 1-3 | Complete |
+| **Security assessment** | Section 1.2, 2.2 | Complete |
+| **Risk evaluation** | Section 1.3, 2.3 | Complete |
+| **Minimum requirements** | Section 4 | Complete |
+| **Continuous monitoring** | Section 5 | Complete |
 
-**Result**: ✅ NIST 800-161 SR-5 Compliant
+**Result**: NIST 800-161 SR-5 Compliant
 
 ### 8.2 ISO/IEC 27036 Compliance
 
 | Clause | Requirement | Implementation | Status |
 |--------|-------------|----------------|--------|
-| **6.1** | Information security policy | This document | ✅ Complete |
-| **6.2** | Supplier selection | Section 1-3 | ✅ Complete |
-| **7.1** | Supplier agreements | Section 6 | ✅ Complete |
-| **7.2** | Supplier management | Section 5-6 | ✅ Complete |
+| **6.1** | Information security policy | This document | Complete |
+| **6.2** | Supplier selection | Section 1-3 | Complete |
+| **7.1** | Supplier agreements | Section 6 | Complete |
+| **7.2** | Supplier management | Section 5-6 | Complete |
 
-**Result**: ✅ ISO 27036 Compliant
+**Result**: ISO 27036 Compliant
 
 ---
 
@@ -281,21 +281,21 @@ All supplier-related events logged to:
 
 ### 9.2 Recommendations
 
-1. ✅ **Continue current supplier relationships** - All meet requirements
-2. ✅ **Maintain automated monitoring** - Weekly scans operational
-3. ✅ **Document supplier changes** - Via supply-chain-events.jsonl
-4. 📋 **Annual comprehensive review** - Schedule for Q4 2025
+1. **Continue current supplier relationships** - All meet requirements
+2. **Maintain automated monitoring** - Weekly scans operational
+3. **Document supplier changes** - Via supply-chain-events.jsonl
+4. **Annual comprehensive review** - Schedule for Q4 2025
 
 ### 9.3 Approval
 
 **Assessment Completed By**: Automated Security Assessment
 **Assessment Date**: 2025-10-10
 **Next Review Date**: 2026-01-10 (Quarterly)
-**Status**: ✅ **ALL SUPPLIERS APPROVED**
+**Status**: **ALL SUPPLIERS APPROVED**
 
 ---
 
 **Compliance Status**:
-- ✅ NIST SP 800-161 SR-5: Complete
-- ✅ ISO/IEC 27036: Complete
-- ✅ FBI CJIS 5.2: Complete
+- NIST SP 800-161 SR-5: Complete
+- ISO/IEC 27036: Complete
+- FBI CJIS 5.2: Complete
