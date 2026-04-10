@@ -9,13 +9,26 @@
   outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = nixpkgs.legacyPackages.${system};
+        pkgs = import nixpkgs {
+          inherit system;
+          config.allowUnfree = true;
+        };
+
+        # Default: Fast deb package extraction (for external users)
         redpanda = pkgs.callPackage ./default.nix { };
+
+        # FIPS: FIPS 140-2 compliant build (for FedRAMP High)
+        redpanda-fips = pkgs.callPackage ./fips.nix { };
+
+        # Bazel: Source builds (for Redpanda employees/development)
+        redpanda-bazel = pkgs.callPackage ./bazel.nix { };
       in
       {
         packages = {
           default = redpanda;
           redpanda = redpanda;
+          redpanda-fips = redpanda-fips;
+          redpanda-bazel = redpanda-bazel;
         };
 
         apps = {
@@ -32,7 +45,7 @@
           update = {
             type = "app";
             program = toString (pkgs.writeShellScript "update-redpanda" ''
-              ${./update.sh} "$@"
+              ${./scripts/update.sh} "$@"
             '');
           };
         };
@@ -446,6 +459,51 @@
                 Can be increased for stricter compliance (e.g., 730 days for 2 years).
               '';
             };
+
+            enforceMFA = mkOption {
+              type = types.bool;
+              default = false;
+              description = ''
+                Enforce Multi-Factor Authentication for Redpanda access.
+
+                **FBI CJIS 5.5.2.2**: MFA mandatory as of October 1, 2024
+
+                When enabled, validates that BOTH are configured:
+                1. SASL authentication (username/password - first factor)
+                2. mTLS client certificates (client cert - second factor)
+
+                This provides MFA by requiring "something you know" (password)
+                and "something you have" (client certificate).
+
+                Example configuration:
+                <programlisting>
+                services.redpanda = {
+                  enforceMFA = true;
+                  settings = {
+                    redpanda = {
+                      # SASL for username/password (first factor)
+                      kafka_api = [{
+                        address = "0.0.0.0";
+                        port = 9092;
+                        authentication_method = "sasl";
+                      }];
+
+                      # mTLS for client certificates (second factor)
+                      kafka_api_tls = [{
+                        enabled = true;
+                        key_file = "/etc/redpanda/certs/tls.key";
+                        cert_file = "/etc/redpanda/certs/tls.crt";
+                        truststore_file = "/etc/redpanda/certs/ca.crt";
+                        require_client_auth = true;  # Critical for MFA
+                      }];
+                    };
+                  };
+                };
+                </programlisting>
+
+                **Compliance**: FBI CJIS 5.5.2.2, NIST 800-63B, STIG IA-2(1)
+              '';
+            };
           };
 
           config = mkIf cfg.enable {
@@ -528,7 +586,7 @@
               allowedTCPPorts = firewallPorts;
             };
 
-            # TLS validation function
+            # TLS and MFA validation
             assertions =
               let
                 redpandaCfg = finalSettings.redpanda or {};
@@ -544,11 +602,34 @@
                   else
                     false;
 
+                # Check if mTLS requires client authentication
+                hasClientAuth = tlsConfig:
+                  if builtins.isList tlsConfig then
+                    any (tls: (tls.enabled or false) && (tls.require_client_auth or false)) tlsConfig
+                  else if builtins.isAttrs tlsConfig then
+                    (tlsConfig.enabled or false) && (tlsConfig.require_client_auth or false)
+                  else
+                    false;
+
+                # Check if SASL is configured
+                hasSASL = apiConfig:
+                  if builtins.isList apiConfig then
+                    any (api: (api.authentication_method or "") == "sasl") apiConfig
+                  else if builtins.isAttrs apiConfig then
+                    (apiConfig.authentication_method or "") == "sasl"
+                  else
+                    false;
+
                 kafkaTLSConfigured = redpandaCfg ? kafka_api_tls && hasTLS redpandaCfg.kafka_api_tls;
                 adminTLSConfigured = redpandaCfg ? admin_api_tls && hasTLS redpandaCfg.admin_api_tls;
                 rpcTLSConfigured = redpandaCfg ? rpc_server_tls && (redpandaCfg.rpc_server_tls.enabled or false);
                 schemaTLSConfigured = schemaRegistryCfg ? schema_registry_api_tls && hasTLS schemaRegistryCfg.schema_registry_api_tls;
                 pandaproxyTLSConfigured = pandaproxyCfg ? pandaproxy_api_tls && hasTLS pandaproxyCfg.pandaproxy_api_tls;
+
+                # MFA validation
+                kafkaMTLSClientAuth = redpandaCfg ? kafka_api_tls && hasClientAuth redpandaCfg.kafka_api_tls;
+                kafkaSASLConfigured = redpandaCfg ? kafka_api && hasSASL redpandaCfg.kafka_api;
+                mfaConfigured = kafkaMTLSClientAuth && kafkaSASLConfigured;
 
                 # Services that are enabled but missing TLS
                 missingTLS = lib.optionals cfg.enforceTLS [
@@ -560,8 +641,9 @@
                 ];
 
                 servicesWithoutTLS = builtins.filter (s: s.condition) missingTLS;
-              in
-                map (s: {
+
+                # TLS assertions
+                tlsAssertions = map (s: {
                   assertion = !cfg.enforceTLS || !s.condition;
                   message = ''
                     services.redpanda.enforceTLS is enabled but TLS is not configured for ${s.service}.
@@ -573,6 +655,44 @@
                     CJIS 5.10 (Encryption) requires FIPS-validated TLS 1.2+ for data in transit.
                   '';
                 }) servicesWithoutTLS;
+
+                # MFA assertion
+                mfaAssertion = [{
+                  assertion = !cfg.enforceMFA || mfaConfigured;
+                  message = ''
+                    services.redpanda.enforceMFA is enabled but MFA is not properly configured.
+
+                    MFA requires BOTH:
+                    1. SASL authentication (first factor: something you know)
+                       ${if kafkaSASLConfigured then "✓ SASL configured" else "✗ SASL NOT configured"}
+
+                    2. mTLS with client authentication (second factor: something you have)
+                       ${if kafkaMTLSClientAuth then "✓ mTLS with client auth configured" else "✗ mTLS client auth NOT configured"}
+
+                    Example configuration:
+                    services.redpanda.settings = {
+                      redpanda = {
+                        kafka_api = [{
+                          address = "0.0.0.0";
+                          port = 9092;
+                          authentication_method = "sasl";  # First factor
+                        }];
+                        kafka_api_tls = [{
+                          enabled = true;
+                          require_client_auth = true;  # Second factor (critical!)
+                          key_file = "/etc/redpanda/certs/tls.key";
+                          cert_file = "/etc/redpanda/certs/tls.crt";
+                          truststore_file = "/etc/redpanda/certs/ca.crt";
+                        }];
+                      };
+                    };
+
+                    FBI CJIS 5.5.2.2: MFA mandatory as of October 1, 2024
+                    NIST 800-63B: Requires MFA for authenticator assurance level 2+
+                  '';
+                }];
+              in
+                tlsAssertions ++ mfaAssertion;
 
             # Add warnings
             warnings =
