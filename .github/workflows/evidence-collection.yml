@@ -1,0 +1,52 @@
+name: Collect Audit Evidence
+
+on:
+  # Monthly on the 1st at 6 AM UTC
+  schedule:
+    - cron: '0 6 1 * *'
+
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Audit period in days'
+        required: false
+        default: '90'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  collect-evidence:
+    name: Collect SOC 2 / NIST Audit Evidence
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v25
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Build packages
+        run: |
+          nix build --show-trace
+          nix build .#redpanda-fips --out-link result-fips || echo "FIPS build skipped"
+
+      - name: Collect evidence
+        run: |
+          chmod +x scripts/collect-evidence.sh
+          DAYS="${{ inputs.days || '90' }}"
+          ./scripts/collect-evidence.sh --days "$DAYS"
+
+      - name: Upload evidence tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-evidence-${{ github.run_id }}
+          path: evidence/evidence-*.tar.gz
+          retention-days: 365

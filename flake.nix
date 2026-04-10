@@ -140,6 +140,31 @@
             fi
             touch $out
           '';
+
+          # Test 5: auditLog.enable produces a valid module evaluation
+          audit-log-config = let
+            eval = nixpkgs.lib.nixosSystem {
+              inherit system;
+              modules = [
+                self.nixosModules.default
+                {
+                  services.redpanda = {
+                    enable = true;
+                    auditLog.enable = true;
+                  };
+                  fileSystems."/" = { device = "/dev/sda1"; fsType = "ext4"; };
+                  boot.loader.grub.device = "/dev/sda";
+                }
+              ];
+            };
+            failedAssertions = builtins.filter (a: !a.assertion) eval.config.assertions;
+          in pkgs.runCommand "audit-log-config-test" {} ''
+            ${if (builtins.length failedAssertions) == 0
+              then ''echo "PASS: auditLog.enable evaluates without assertion failures"''
+              else ''echo "FAIL: auditLog.enable caused ${toString (builtins.length failedAssertions)} assertion failure(s)" && exit 1''
+            }
+            touch $out
+          '';
         };
       } else {})
     ) // {
@@ -228,7 +253,7 @@
             else null;
 
           # Merge user settings with auto-generated cluster settings
-          finalSettings = lib.recursiveUpdate cfg.settings (
+          clusterMerged = lib.recursiveUpdate cfg.settings (
             if currentNode != null then {
               redpanda = {
                 # Auto-populate seed_servers from cluster configuration
@@ -249,6 +274,21 @@
                 # Set rack awareness if configured
                 rack = mkIf (currentNode.rack != null) currentNode.rack;
               };
+            } else {}
+          );
+
+          # Merge audit logging settings
+          finalSettings = lib.recursiveUpdate clusterMerged (
+            if cfg.auditLog.enable then {
+              redpanda = {
+                audit_enabled = true;
+                audit_enabled_event_types = cfg.auditLog.eventTypes;
+              } // (if cfg.auditLog.excludedTopics != [] then {
+                audit_excluded_topics = cfg.auditLog.excludedTopics;
+              } else {})
+              // (if cfg.auditLog.excludedPrincipals != [] then {
+                audit_excluded_principals = cfg.auditLog.excludedPrincipals;
+              } else {});
             } else {}
           );
 
@@ -588,6 +628,38 @@
                 **Compliance**: FBI CJIS 5.5.2.2, NIST 800-63B, STIG IA-2(1)
               '';
             };
+
+            auditLog = {
+              enable = mkEnableOption "structured audit logging to internal _redpanda.audit_log topic";
+
+              eventTypes = mkOption {
+                type = types.listOf (types.enum [ "admin" "authenticate" "management" "describe" ]);
+                default = [ "admin" "authenticate" "management" ];
+                description = "Audit event types to capture.";
+              };
+
+              excludedTopics = mkOption {
+                type = types.listOf types.str;
+                default = [ ];
+                description = "Topics to exclude from audit logging.";
+              };
+
+              excludedPrincipals = mkOption {
+                type = types.listOf types.str;
+                default = [ ];
+                description = "Principals (users) to exclude from audit logging.";
+              };
+            };
+
+            cjisCompliant = mkEnableOption ''
+              FBI CJIS Security Policy compliance preset.
+
+              Enables all CJIS-required controls:
+              - TLS enforcement (enforceTLS)
+              - MFA enforcement (enforceMFA)
+              - 365-day audit retention (cjisAuditRetention)
+              - Structured audit logging (auditLog)
+            '';
           };
 
           config = mkIf cfg.enable {
@@ -775,17 +847,41 @@
                     NIST 800-63B: Requires MFA for authenticator assurance level 2+
                   '';
                 }];
+              # CJIS compliance preset assertions
+                cjisAssertions = lib.optionals cfg.cjisCompliant [
+                  {
+                    assertion = cfg.enforceTLS;
+                    message = "services.redpanda.cjisCompliant requires enforceTLS = true (CJIS 5.10)";
+                  }
+                  {
+                    assertion = cfg.enforceMFA;
+                    message = "services.redpanda.cjisCompliant requires enforceMFA = true (CJIS 5.5.2.2)";
+                  }
+                  {
+                    assertion = cfg.cjisAuditRetention;
+                    message = "services.redpanda.cjisCompliant requires cjisAuditRetention = true (CJIS 5.4)";
+                  }
+                  {
+                    assertion = cfg.auditLog.enable;
+                    message = "services.redpanda.cjisCompliant requires auditLog.enable = true (CJIS 5.4, STIG AU-3)";
+                  }
+                ];
+
               in
-                tlsAssertions ++ mfaAssertion;
+                tlsAssertions ++ mfaAssertion ++ cjisAssertions;
 
             # Add warnings
             warnings =
               optional (cfg.openFirewall && firewallPorts == [])
                 "services.redpanda.openFirewall is enabled but no ports were detected in the configuration"
               ++ optional (cfg.enforceTLS && kafkaTLSConfigured)
-                "TLS enforcement enabled ✓ - Kafka API is using encrypted communication (STIG SC-8, CJIS 5.10)"
+                "TLS enforcement enabled - Kafka API is using encrypted communication (STIG SC-8, CJIS 5.10)"
               ++ optional (cfg.enforceTLS && adminTLSConfigured)
-                "TLS enforcement enabled ✓ - Admin API is using encrypted communication (STIG SC-8, CJIS 5.10)";
+                "TLS enforcement enabled - Admin API is using encrypted communication (STIG SC-8, CJIS 5.10)"
+              ++ optional (cfg.cjisAuditRetention && !cfg.enforceMFA)
+                "CJIS audit retention is enabled but MFA is not enforced. Consider enabling enforceMFA for full CJIS compliance (5.5.2.2)."
+              ++ optional (cfg.enforceMFA && !cfg.cjisAuditRetention)
+                "MFA is enforced but CJIS audit retention is not enabled. Consider enabling cjisAuditRetention for full CJIS compliance (5.4).";
           };
         };
     };

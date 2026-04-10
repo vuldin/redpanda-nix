@@ -102,6 +102,11 @@ jobs:
           echo "Testing package build..."
           nix build --show-trace
 
+      - name: Publish compliance artifacts
+        run: |
+          chmod +x scripts/publish-compliance-artifacts.sh
+          ./scripts/publish-compliance-artifacts.sh ${{ needs.check-update.outputs.new_version }} || echo "Skipping artifact publish (artifacts may not have been generated)"
+
       - name: Commit changes
         run: |
           git add default.nix fips.nix flake.nix compliance/
@@ -163,12 +168,12 @@ jobs:
 
           ### Compliance Status
 
-          This update maintains compliance with:
-          - ✅ SOC 2 Type II (100%)
-          - ✅ NIST SP 800-161 (95%)
-          - ✅ DoD SBOM Management (95%)
-          - ✅ FBI CJIS Security Policy (95%)
-          - 🟡 FedRAMP High (90% with FIPS)
+          Compliance status (see docs/compliance/COMPLIANCE_MATRIX.md):
+          - SOC 2 Type II (~90%)
+          - FBI CJIS v6.0 (~80%)
+          - NIST SP 800-161 (~70%)
+          - ISO/IEC 27036 (~60%)
+          - FedRAMP High (~55%)
 
           ---
 
@@ -327,12 +332,43 @@ jobs:
 
           ### Compliance Status
 
-          These artifacts satisfy:
-          - ✅ DoD SBOM Management requirements (100%)
-          - ✅ NIST SP 800-161 (Supply Chain Risk Management) (100%)
-          - ✅ U.S. Army SBOM mandate (effective 2025)
-          - ✅ NIST CSF 2.0 GV.SC controls (automated monitoring)
-          - ✅ Automated vulnerability alerting (this PR)"
+          These artifacts support:
+          - DoD SBOM Management (~50%)
+          - NIST SP 800-161 Supply Chain (~70%)
+          - NIST CSF 2.0 GV.SC controls (~50%)
+          - Automated vulnerability alerting (this PR)"
+
+  create-release:
+    needs: [check-update, update-package]
+    if: needs.check-update.outputs.has_update == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: update-redpanda-${{ needs.check-update.outputs.new_version }}
+
+      - name: Create GitHub Release with compliance artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.check-update.outputs.new_version }}
+          name: Redpanda v${{ needs.check-update.outputs.new_version }}
+          draft: true
+          body: |
+            ## Redpanda v${{ needs.check-update.outputs.new_version }}
+
+            Automated package update from v${{ needs.check-update.outputs.current_version }}.
+
+            ### Compliance Artifacts
+
+            SBOM and provenance files are attached to this release for DoD SBOM Management and NIST SP 800-161 compliance.
+          files: |
+            compliance/redpanda-${{ needs.check-update.outputs.new_version }}-sbom.json
+            compliance/redpanda-${{ needs.check-update.outputs.new_version }}-sbom.spdx.json
+            compliance/redpanda-${{ needs.check-update.outputs.new_version }}-provenance.json
+            compliance/redpanda-${{ needs.check-update.outputs.new_version }}-vulnerabilities.csv
+          fail_on_unmatched_files: false
 
   notify-no-update:
     needs: check-update

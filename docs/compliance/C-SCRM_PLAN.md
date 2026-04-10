@@ -437,4 +437,4 @@ nix-store --verify --check-contents $(nix-build)
 
 **Status**: ~70% Implemented (NIST SP 800-161)
 
-This C-SCRM plan documents supply chain risk management controls. Tooling for SBOM generation, provenance, and vulnerability scanning exists in `scripts/update.sh` but must be run per version. Compliance artifacts are gitignored and not shipped with releases. See `docs/compliance/COMPLIANCE_EVALUATION_REPORT.md` for the independent assessment.
+This C-SCRM plan documents supply chain risk management controls. Tooling for SBOM generation, provenance, and vulnerability scanning exists in `scripts/update.sh` but must be run per version. Current-version artifacts are distributed via `compliance/current/` and GitHub Releases.

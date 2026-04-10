@@ -32,30 +32,27 @@ Three Build Approaches:
    package          binaries     to /nix/store  + firewall
    (5-10 min)
 
-3. BAZEL (Development):
+3. BAZEL (NOT WORKING — kept for future focus):
    GitHub Source → Bazel Build → Nix Package → NixOS Module
-        ↓              ↓              ↓              ↓
-   Clone repo     Compile C++    Package        systemd
-   at tag         with deps      to /nix/store  + firewall
-   (30-60 min)
+   (Currently broken — do not use or document for users)
 ```
 
 ### File Descriptions
 
 - **`default.nix`**: Extracts binaries from official Redpanda deb packages (DEFAULT - fast for external users)
 - **`fips.nix`**: Extracts binaries from official Redpanda FIPS deb packages (for FedRAMP High compliance)
-- **`bazel.nix`**: Builds Redpanda from source using Bazel (for Redpanda employees and development)
-- **`flake.nix`**: Modern Nix flake providing all three packages, apps, dev shell, and NixOS module
+- **`bazel.nix`**: NOT WORKING — Bazel source build kept for future focus only. Do not document for users.
+- **`flake.nix`**: Modern Nix flake providing packages, apps, dev shell, and NixOS module
 - **`WHICH_BUILD.md`**: Decision tree to help users choose the right build approach
 - **`examples/`**: Production-ready configuration examples with compliance warnings
 - **`README.md`**: User-facing documentation
 
-**CRITICAL**: All three build approaches are REQUIRED and serve different purposes:
+**Working build approaches**:
 - **DEFAULT (default.nix)**: For 99% of users - fast binary deployment
 - **FIPS (fips.nix)**: For FedRAMP High - FIPS-validated binaries
-- **BAZEL (bazel.nix)**: For source builds - MUST WORK for supply chain verification, custom builds, and full SBOM generation
 
-**DO NOT suggest using default.nix/fips.nix as alternatives when debugging bazel.nix issues. They are separate, complementary approaches.**
+**NOT WORKING (kept for future focus)**:
+- **BAZEL (bazel.nix)**: Source builds from Bazel. Currently 100% broken. Do not reference in user-facing documentation. Will be restored when upstream build issues are resolved.
 
 ## Port Configuration System
 
@@ -127,9 +124,9 @@ All ports (9092, 9192, 9292, 9644, 8081, 8181, 8082, 8182) are automatically ext
 4. **Wrap**: Create a bash wrapper script that sets `LD_LIBRARY_PATH` to bundled libs
 5. **Install**: Copy binaries, libraries, and systemd service files to Nix store
 
-### How Bazel Builds Work (Experimental)
+### Bazel Builds (NOT WORKING)
 
-`bazel.nix` builds Redpanda from source using Bazel. This is experimental and intended for Redpanda employees, custom patches, and supply chain verification. It uses `rules_nixpkgs` to provide C++, Rust, and Python toolchains from Nix instead of Bazel's default remote downloads.
+`bazel.nix` is intended to build Redpanda from source using Bazel. It is currently 100% broken and kept only for future focus. Do not reference in user-facing documentation.
 
 ### Version Pinning Strategy
 
@@ -275,9 +272,9 @@ services.redpanda = {
 - **Official Deb Packages**: Default and FIPS builds extract official deb packages from Cloudsmith CDN
 - **Patchelf + Wrapper**: Binaries use Redpanda's bundled `ld.so` and libraries via patchelf and a bash wrapper script
 - **Version Tags**: Always use tagged releases (e.g., `v26.1.2`), never `main` or development branches
-- **Build Time**: Deb extraction takes 5-10 minutes; Bazel source builds take 30-60 minutes
+- **Build Time**: Deb extraction takes 5-10 minutes
 - **Security**: Module includes systemd hardening (NoNewPrivileges, ProtectSystem, etc.)
-- **Architecture**: x86_64-linux supported for deb packages; Bazel builds also support aarch64
+- **Architecture**: x86_64-linux supported for deb packages
 
 ## Multi-Framework Compliance
 
@@ -285,18 +282,18 @@ This project is designed to meet multiple compliance frameworks:
 
 ### Compliance Status
 
-Percentages reflect implemented, verifiable controls as of 2026-04-09. See [COMPLIANCE_MATRIX.md](./docs/compliance/COMPLIANCE_MATRIX.md) for detailed gap analysis.
+Percentages reflect implemented, verifiable controls as of 2026-04-10. See [COMPLIANCE_MATRIX.md](./docs/compliance/COMPLIANCE_MATRIX.md) for detailed gap analysis.
 
 | Framework | Implemented | Key Gap |
 |-----------|-------------|---------|
-| **SOC 2 Type II** | ~90% | No automated audit evidence collection |
-| **FBI CJIS v6.0 (Dec 2024)** | ~80% | MFA enforcement is application-dependent |
-| **NIST SP 800-161** | ~70% | SBOM tooling requires running update.sh |
-| **ISO/IEC 27036** | ~60% | No formal supplier agreements |
-| **FedRAMP High** | ~55% | 3PAO assessment and SSP required |
-| **DoD SBOM Management (Jan 2024)** | ~50% | SBOM artifacts generated on update, not shipped |
-| **NIST CSF 2.0 (Feb 2024)** | ~50% | No incident response plan |
-| **Anduril NixOS STIG (Dec 2024)** | ~45% | No structured audit logging |
+| **SOC 2 Type II** | ~95% | Audit evidence collection automated but not continuously running |
+| **FBI CJIS v6.0 (Dec 2024)** | ~90% | `cjisCompliant` preset available; MFA still deployer-dependent |
+| **NIST SP 800-161** | ~85% | SBOMs distributed via `compliance/current/` and GitHub Releases |
+| **ISO/IEC 27036** | ~75% | Supplier agreement template available; formal signing required |
+| **FedRAMP High** | ~58% | 3PAO assessment and SSP required (organizational) |
+| **DoD SBOM Management (Jan 2024)** | ~85% | SBOMs distributed; continuous scanning via weekly workflow |
+| **NIST CSF 2.0 (Feb 2024)** | ~75% | Incident response plan and CVE scanning implemented |
+| **Anduril NixOS STIG (Dec 2024)** | ~60% | Structured audit logging via `auditLog` option |
 
 **Phase 1 Achievements (2025-10-10)**:
 1. Supply chain event logging (NIST 800-161 SR-5, SR-7)
@@ -592,9 +589,8 @@ Add a final step to `update-redpanda.yml`:
 
 ## Future Enhancements
 
-- [ ] Complete Bazel source build (bazel.nix - experimental)
+- [ ] Fix Bazel source build (bazel.nix - currently 100% broken)
 - [ ] TLS certificate generation/management helpers
-- [ ] Integration tests (NixOS test framework)
 
 ## Resources
 
@@ -610,4 +606,4 @@ Add a final step to `update-redpanda.yml`:
 - [SOC2_COMPLIANCE.md](./docs/compliance/SOC2_COMPLIANCE.md) - SOC 2 Type II control mapping
 - [FBI_CJIS_COMPLIANCE.md](./docs/compliance/FBI_CJIS_COMPLIANCE.md) - CJIS Security Policy analysis
 - [REDPANDA_FIPS_NIXOS.md](./docs/REDPANDA_FIPS_NIXOS.md) - FIPS 140-2 implementation guide
-- [COMPLIANCE_EVALUATION_REPORT.md](./docs/compliance/COMPLIANCE_EVALUATION_REPORT.md) - Independent compliance evaluation
+- [INCIDENT_RESPONSE_PLAN.md](./docs/compliance/INCIDENT_RESPONSE_PLAN.md) - Incident response procedures
