@@ -253,22 +253,6 @@ sudo ./scripts/uninstall.sh          # keeps config and data
 sudo ./scripts/uninstall.sh --purge  # removes everything
 ```
 
-### Uninstall Nix (Optional)
-
-**Warning**: This removes ALL Nix packages, not just Redpanda.
-
-```bash
-# If using Determinate Systems installer
-sudo /nix/nix-installer uninstall
-
-# If using standard Nix installer
-sudo systemctl stop nix-daemon
-sudo systemctl disable nix-daemon
-sudo rm -rf /nix /etc/nix ~/.nix-* /etc/profile.d/nix.sh
-for i in {1..32}; do sudo userdel nixbld$i; done
-sudo groupdel nixbld
-```
-
 ---
 
 ## 8. Troubleshooting
