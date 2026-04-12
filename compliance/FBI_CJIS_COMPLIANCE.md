@@ -142,9 +142,7 @@ The CJIS Security Policy v6.0 has **13 key policy areas**:
 | **AU-9** | Protection of Audit Information | systemd protections | Need 365-day retention policy |
 | **AU-11** | Audit Record Retention | Default systemd retention | **Must configure 365+ days** |
 
-**Current Status**: **60% Compliant**
-
-**Gap**: Need structured audit logging with 365-day retention.
+**Current Status**: **Partial -- needs structured audit logging with 365-day retention**
 
 ---
 
@@ -159,7 +157,7 @@ The CJIS Security Policy v6.0 has **13 key policy areas**:
 | **AC-6** | Least Privilege | Non-root execution, limited file access | Complete |
 | **AC-7** | Unsuccessful Logon Attempts | Redpanda internal | N/A (app-level) |
 
-**Current Status**: ~90% (application-level controls)
+**Current Status**: **Strong** (application-level controls)
 
 ---
 
@@ -194,7 +192,7 @@ The CJIS Security Policy v6.0 has **13 key policy areas**:
 | **CM-7** | Least Functionality | Minimal package, no unnecessary services | Complete |
 | **CM-8** | Information System Component Inventory | `flake.lock`, `/nix/store` | Complete |
 
-**Current Status**: ~90%
+**Current Status**: **Strong**
 
 ---
 
@@ -208,7 +206,7 @@ The CJIS Security Policy v6.0 has **13 key policy areas**:
 | **SC-13** | Cryptographic Protection | FIPS mode supported | Must be enabled |
 | **SC-28** | Protection of Information at Rest | Redpanda encryption at rest | Must be configured |
 
-**Current Status**: **70% Compliant** (TLS/FIPS available, not enforced)
+**Current Status**: **Partial -- TLS/FIPS available but not enforced by default**
 
 **Gap**: Need `enforceTLS` option and FIPS-by-default mode for CJIS deployments.
 
@@ -225,7 +223,7 @@ The CJIS Security Policy v6.0 has **13 key policy areas**:
 | **SI-7** | Software Integrity | SHA256 verification, reproducible builds | Complete |
 | **SI-10** | Information Input Validation | Redpanda internal | N/A (app-level) |
 
-**Current Status**: ~90% (application-level controls)
+**Current Status**: **Strong** (application-level controls)
 
 ---
 
@@ -241,7 +239,7 @@ The CJIS Security Policy v6.0 has **13 key policy areas**:
 | **Vendor Notification Agreements** | N/A (open source) | N/A |
 | **Component Inspection** | `nix-store --verify`, SBOM scanning | Complete |
 
-**Current Status**: **90% Compliant** (missing formal SCRM policy document)
+**Current Status**: **Strong -- missing formal SCRM policy document**
 
 **Strength**: This package's reproducible builds and SBOM generation directly address CJIS v6.0's new supply chain requirements.
 
@@ -272,7 +270,7 @@ The CJIS Security Policy v6.0 has **13 key policy areas**:
 
 ### Relationship
 
-**CJIS is based on FedRAMP/NIST 800-53**, so achieving FedRAMP compliance gets you ~80% of the way to CJIS.
+**CJIS is based on FedRAMP/NIST 800-53**, so achieving FedRAMP compliance covers most CJIS requirements.
 
 | Framework | Scope | Controls | Encryption | MFA | Audit Logs |
 |-----------|-------|----------|-----------|-----|------------|
@@ -464,11 +462,11 @@ git log --all --oneline --since "365 days ago" >> cjis-evidence/5.7-config-mgmt.
 
 # 5.11 System Integrity: SHA256 verification
 echo "=== CJIS 5.11 System Integrity ===" > cjis-evidence/5.11-integrity.txt
-nix-store --verify --check-contents $(nix-build default.nix) >> cjis-evidence/5.11-integrity.txt
+nix-store --verify --check-contents $(nix build .#redpanda-deb --print-out-paths) >> cjis-evidence/5.11-integrity.txt
 
 # Supply Chain: SBOM + Provenance
-sbomnix $(nix-build default.nix) --sbom cyclonedx --output cjis-evidence/sbom.json
-sbomnix $(nix-build default.nix) --provenance slsa --output cjis-evidence/provenance.json
+sbomnix $(nix build .#redpanda-deb --print-out-paths) --sbom cyclonedx --output cjis-evidence/sbom.json
+sbomnix $(nix build .#redpanda-deb --print-out-paths) --provenance slsa --output cjis-evidence/provenance.json
 
 # Package for CJIS audit
 tar czf cjis-compliance-evidence-$(date +%Y%m%d).tar.gz cjis-evidence/
@@ -526,7 +524,7 @@ echo "CJIS compliance evidence package created"
 - Declarative config (change control)
 - Git audit trail (configuration management)
 
-**Result**: This package provides 80-90% of CJIS technical controls. Remaining 10-20% are organizational policies (training, background checks, physical security).
+**Result**: This package provides strong coverage of CJIS application-level technical controls. Remaining gaps are organizational policies (training, background checks, physical security).
 
 ---
 
@@ -534,21 +532,21 @@ echo "CJIS compliance evidence package created"
 
 ### Overall Status
 
-| CJIS Policy Area | Score | Status |
-|-----------------|-------|--------|
-| 5.4 Auditing | 60% | Needs 365-day retention |
-| 5.5 Access Control | 100% | Complete |
+| CJIS Policy Area | Coverage | Status |
+|-----------------|----------|--------|
+| 5.4 Auditing | Partial | Needs 365-day retention |
+| 5.5 Access Control | Strong | Complete |
 | 5.6 Authentication | N/A | App configuration |
-| 5.7 Config Management | 100% | Complete |
-| 5.10 Encryption | 70% | FIPS available, not enforced |
-| 5.11 System Integrity | 100% | Complete |
-| Supply Chain (NEW) | 90% | Need formal SCRM doc |
+| 5.7 Config Management | Strong | Complete |
+| 5.10 Encryption | Partial | FIPS available, not enforced |
+| 5.11 System Integrity | Strong | Complete |
+| Supply Chain (NEW) | Strong | Need formal SCRM doc |
 
-**Current Compliance**: **80% (Application-Level Technical Controls)**
+**Current Coverage**: Strong technical control coverage for application-level controls.
 
-**With Phase 1-3 Enhancements**: **95% (Full Technical Compliance)**
+**With Phase 1-3 Enhancements**: Full technical compliance for application-level controls.
 
-**Remaining 5%**: Organizational policies (training, background checks, physical security, triennial audits)
+**Remaining gaps**: Organizational policies (training, background checks, physical security, triennial audits)
 
 ---
 
@@ -558,7 +556,7 @@ echo "CJIS compliance evidence package created"
 
 | Framework | Relationship to CJIS | Easier/Harder? |
 |-----------|---------------------|----------------|
-| **FedRAMP High** | ~80% overlap with CJIS | Harder (requires 3PAO, more controls) |
+| **FedRAMP High** | Significant overlap with CJIS | Harder (requires 3PAO, more controls) |
 | **FISMA** | Underlying framework | Same difficulty |
 | **StateRAMP** | State-level FedRAMP | Similar difficulty |
 
@@ -571,15 +569,15 @@ echo "CJIS compliance evidence package created"
 ### Key Takeaways
 
 1. **CJIS is FBI-specific** but based on familiar NIST 800-53 controls
-2. **This package achieves 80% compliance** for application-level technical controls
+2. **This package provides strong coverage** of application-level technical controls
 3. **Critical gaps are fixable** in 1-2 weeks (audit retention, FIPS mode, MFA config)
-4. **CJIS v6.0 (Dec 2024) emphasizes supply chain security** - this package's reproducible builds and SBOM generation are perfectly aligned
+4. **CJIS v6.0 (Dec 2024) emphasizes supply chain security** - this package's reproducible builds and SBOM generation are well aligned
 5. **No expensive 3PAO assessment** required (unlike FedRAMP)
 
 ### Compliance Path
 
 ```
-Current Package (80% CJIS)
+Current Package (strong application-level controls)
     ↓
 + Phase 1: 365-day logs, FIPS, MFA (2 weeks)
     ↓
@@ -587,11 +585,11 @@ Current Package (80% CJIS)
     ↓
 + Phase 3: Formal documentation (1 week)
     ↓
-= 95% CJIS Compliance (Technical)
+= Full CJIS Technical Compliance
     ↓
 + Organizational policies (training, background checks)
     ↓
-= 100% CJIS Compliance
+= Complete CJIS Compliance
 ```
 
 **Total Time to CJIS Compliance**: 1 month (technical) + ongoing (organizational)
@@ -608,7 +606,7 @@ Current Package (80% CJIS)
 ### This Package Documentation
 - **FIPS Implementation**: [REDPANDA_FIPS_NIXOS.md](./REDPANDA_FIPS_NIXOS.md)
 - **FedRAMP Compliance**: [COMPLIANCE_MATRIX.md §7](./COMPLIANCE_MATRIX.md)
-- **Supply Chain Security**: [COMPLIANCE_COMPARISON.md](./COMPLIANCE_COMPARISON.md)
+- **Supply Chain Security**: [C-SCRM_PLAN.md](./C-SCRM_PLAN.md)
 - **Installation Guide**: [INSTALLATION_GUIDE.md](./INSTALLATION_GUIDE.md)
 
 ---
@@ -616,4 +614,4 @@ Current Package (80% CJIS)
 **Document Version**: 1.0
 **Last Updated**: 2025-10-10
 **CJIS Policy Version**: v6.0 (December 27, 2024)
-**Compliance Status**: 80% (technical controls)
+**Compliance Status**: Strong technical control coverage. Remaining gaps are organizational.

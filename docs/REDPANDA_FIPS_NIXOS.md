@@ -1,49 +1,43 @@
-# Redpanda FIPS on NixOS: Superior FIPS Compliance
-## Eliminating Container-Based Limitations
+# Redpanda FIPS on NixOS
+## FIPS 140-2 Deployment Guide
 
-**Document Version**: 1.0
-**Last Updated**: 2025-10-10
+**Document Version**: 1.1
+**Last Updated**: 2026-04-12
 **Compliance**: FedRAMP High SC-13 (Cryptographic Protection)
 
 ---
 
-## Executive Summary
+## Overview
 
-Deploying **Redpanda FIPS packages on NixOS** provides **superior FIPS 140-2 compliance** compared to Redpanda's standard container deployments. By building with Nix, we eliminate the FIPS limitations documented in Redpanda's official container-based deployment guide.
+Deploying Redpanda FIPS packages on NixOS enables system-wide FIPS 140-2 enforcement, addressing the limitations documented in Redpanda's official container-based deployment guide.
 
-###  Key Advantages
+### Deployment Comparison
 
-| Feature | Container Deployment | **NixOS Deployment** |
+| Feature | Container Deployment | NixOS Deployment |
 |---------|---------------------|---------------------|
-| **FIPS Compliance** | ⚠️ Partial (Kubernetes limitations) | ✅ **Full system-wide FIPS** |
-| **Redpanda Console** | ❌ Not FIPS-compliant | ✅ **Build with FIPS Go crypto** |
-| **Cryptographic Stack** | ⚠️ Mixed (container layers) | ✅ **100% FIPS-validated** |
-| **Reproducibility** | ❌ Container drift | ✅ **Byte-for-byte identical** |
-| **Auditability** | ⚠️ Limited | ✅ **Complete dependency graph** |
-| **Rollback** | ⚠️ Manual redeployment | ✅ **Atomic (<1 min)** |
+| **FIPS Compliance** | Partial (Kubernetes limitations per Redpanda docs) | System-wide FIPS enforcement |
+| **Redpanda Console** | Not FIPS-compliant (per Redpanda docs) | Can be built with FIPS Go crypto |
+| **Cryptographic Stack** | Mixed across container layers | Single FIPS-validated OpenSSL via overlay |
+| **Reproducibility** | Container drift possible with image updates | Byte-for-byte identical via `flake.lock` |
+| **Auditability** | Requires external tooling for full dependency analysis | Complete dependency graph via `nix-store` |
+| **Rollback** | Redeployment required | Atomic via `nixos-rebuild switch --rollback` |
 
 ---
 
-## Why Nix Eliminates Redpanda's FIPS Limitations
+## How NixOS Addresses Redpanda's FIPS Limitations
 
 ### Redpanda's Documented Limitations (Container-Based)
 
 From [Redpanda FIPS Documentation](https://docs.redpanda.com/current/manage/security/fips-compliance/):
 
-> ⚠️ **Limitations:**
+> **Limitations:**
 > - Not fully FIPS-compliant in Kubernetes deployments
 > - Redpanda Console is not FIPS-compliant
 > - PKCS#12 keys are not supported in FIPS mode
 
-**Root Cause**: These limitations stem from:
-1. Container runtime complexities
-2. Kubernetes networking layers (non-FIPS components)
-3. Pre-built container images with mixed dependencies
-4. No control over base image cryptographic libraries
+These limitations stem from container runtime complexities, mixed dependencies in base images, and lack of control over the full cryptographic stack.
 
-### NixOS Solution: System-Level FIPS Enforcement
-
-**Nix eliminates these limitations through**:
+### NixOS Approach: System-Level FIPS Enforcement
 
 1. **Complete Stack Control**
    ```nix
@@ -59,15 +53,15 @@ From [Redpanda FIPS Documentation](https://docs.redpanda.com/current/manage/secu
 
      # Redpanda with FIPS
      services.redpanda = {
-       package = pkgs.callPackage ./default.nix { useFips = true; };
+       package = pkgs.callPackage ./fips.nix { };
        settings.redpanda.fips_mode = "enabled";
      };
    }
    ```
 
 2. **No Hidden Dependencies**
-   - Containers: Unknown libraries in base images
-   - Nix: Every dependency in `/nix/store` with cryptographic hash
+   - Every dependency tracked in `/nix/store` with cryptographic hash
+   - Full dependency graph inspectable via `nix-store -q --tree`
 
 3. **Reproducible FIPS Builds**
    - Same `flake.lock` → identical FIPS system on any machine
@@ -95,10 +89,10 @@ From [Redpanda FIPS Documentation](https://docs.redpanda.com/current/manage/secu
 
 ## Implementation Guide
 
-### Phase 1: Redpanda FIPS Package (default.nix)
+### Phase 1: Redpanda FIPS Package (fips.nix)
 
 ```nix
-# default.nix
+# fips.nix
 { pkgs ? import <nixpkgs> {}
 , lib ? pkgs.lib
 , useFips ? false  # Enable FIPS mode
@@ -183,7 +177,7 @@ in pkgs.stdenv.mkDerivation rec {
       with lib;
       let
         cfg = config.services.redpanda;
-        redpandaPkg = pkgs.callPackage ./default.nix {
+        redpandaPkg = pkgs.callPackage ./fips.nix {
           useFips = cfg.fipsMode;
         };
       in
@@ -549,23 +543,23 @@ nix-store -q --references /run/current-system | xargs nix-store -q --tree | grep
 
 ---
 
-## Compliance Benefits for FedRAMP High
+## Compliance Notes for FedRAMP High
 
-### SC-13: Cryptographic Protection - ✅ **FULLY SATISFIED**
+### SC-13: Cryptographic Protection
 
 **FedRAMP Requirement**:
 > The information system implements FIPS-validated cryptography to protect sensitive information
 
-**Nix + Redpanda FIPS Implementation**:
+**NixOS Implementation**:
 
-| Requirement | Traditional Containers | **Nix/NixOS** | Status |
-|-------------|----------------------|---------------|--------|
-| **Data at rest** | ⚠️ Mixed libraries | ✅ FIPS OpenSSL 3.0.9 | ✅ Met |
-| **Data in transit (TLS)** | ⚠️ Mixed libraries | ✅ FIPS OpenSSL 3.0.9 | ✅ Met |
-| **Authentication** | ⚠️ Mixed libraries | ✅ FIPS OpenSSL 3.0.9 | ✅ Met |
-| **Hashing/RNG** | ⚠️ Mixed libraries | ✅ FIPS OpenSSL 3.0.9 | ✅ Met |
-| **Key generation** | ⚠️ Mixed libraries | ✅ FIPS OpenSSL 3.0.9 | ✅ Met |
-| **Full stack validation** | ❌ Not possible | ✅ **Complete audit trail** | ✅ **Exceeded** |
+| Requirement | NixOS Approach |
+|-------------|---------------|
+| **Data at rest** | FIPS OpenSSL via system-wide overlay |
+| **Data in transit (TLS)** | FIPS OpenSSL via system-wide overlay |
+| **Authentication** | FIPS OpenSSL via system-wide overlay |
+| **Hashing/RNG** | FIPS OpenSSL via system-wide overlay |
+| **Key generation** | FIPS OpenSSL via system-wide overlay |
+| **Full stack validation** | Complete audit trail via `nix-store` dependency graph |
 
 **Evidence for Auditors**:
 ```bash
@@ -596,109 +590,35 @@ bash /tmp/fips-audit.sh > fips-compliance-$(date +%Y%m%d).txt
 
 ---
 
-## Cost-Benefit Analysis
-
-### Container-Based Redpanda FIPS
-
-**Costs**:
-- ⚠️ Partial FIPS compliance (Kubernetes limitations)
-- ⚠️ Console not FIPS-compliant (separate workarounds needed)
-- ⚠️ Complex multi-layer security validation
-- ⚠️ Limited audit trail (opaque container layers)
-- **Effort**: High ongoing compliance verification
-- **Risk**: Mixed FIPS/non-FIPS components
-
-### Nix-Based Redpanda FIPS
-
-**Benefits**:
-- ✅ Complete FIPS compliance (system-wide enforcement)
-- ✅ Console buildable with FIPS (full stack control)
-- ✅ Single-source cryptographic validation
-- ✅ Complete audit trail (`nix-store` dependency graph)
-- **Effort**: Low - compliance is architectural
-- **Risk**: Low - reproducible, verifiable builds
-
-**ROI**:
-- **Time saved**: 50-70% reduction in FIPS validation effort
-- **Audit cost**: 40-60% reduction (automated evidence collection)
-- **Risk reduction**: Elimination of partial-compliance scenarios
-
----
-
-## Comparison Summary
-
-### Redpanda Official Documentation (Container-Based)
-
-From https://docs.redpanda.com/current/manage/security/fips-compliance/:
-
-> **Limitations:**
-> - Not fully FIPS-compliant in Kubernetes deployments
-> - Redpanda Console is not FIPS-compliant
-> - PKCS#12 keys are not supported in FIPS mode
-
-**Conclusion**: "Partial FIPS compliance with workarounds needed"
-
-### Nix-Based Deployment
-
-✅ **No Kubernetes layer** - Direct systemd service on FIPS-enabled kernel
-✅ **Console FIPS-compliant** - Built from source with FIPS Go crypto
-✅ **Full PKCS support** - System-wide FIPS enforcement, no container limitations
-✅ **Complete audit trail** - Every cryptographic component verifiable via `nix-store`
-✅ **Reproducible** - Same `flake.lock` → identical FIPS system
-
-**Conclusion**: "Complete FIPS compliance with zero workarounds"
-
----
-
 ## Next Steps
-
-### Immediate (Week 1-2)
 
 1. **Test FIPS package availability**:
    ```bash
-   # Check if Redpanda FIPS package exists for your version
    curl -I "https://github.com/redpanda-data/redpanda/releases/download/v25.2.8/redpanda-fips-25.2.8-amd64.tar.gz"
    ```
-
-2. **Update default.nix** with FIPS support (add `useFips` parameter)
-
-3. **Test FIPS build** on development system
-
-### Short-Term (Month 1)
-
-1. **System-wide FIPS configuration**: Add kernel parameter and OpenSSL overlay
-
-2. **Build Redpanda Console** with FIPS-validated Go crypto
-
-3. **Verification scripts**: Automate FIPS validation checks
-
-### Medium-Term (Month 2-3)
-
-1. **FedRAMP documentation**: Update SSP with Nix-based FIPS implementation
-
-2. **Audit preparation**: Generate evidence for 3PAO
-
-3. **Continuous monitoring**: Integrate FIPS checks into CI/CD
+2. **Build and test** FIPS package on a development system
+3. **Configure system-wide FIPS**: kernel parameter + OpenSSL overlay
+4. **Build Redpanda Console** with FIPS-validated Go crypto
+5. **Automate verification**: integrate FIPS checks into CI/CD
+6. **FedRAMP preparation**: update SSP, generate 3PAO evidence
 
 ---
 
 ## Conclusion
 
-**Deploying Redpanda FIPS on NixOS provides the strongest possible FIPS 140-2 compliance** for FedRAMP High requirements:
+Deploying Redpanda FIPS on NixOS enables:
 
-✅ **Eliminates** Redpanda's documented container limitations
-✅ **Enables** full FIPS compliance for Redpanda Console
-✅ **Provides** complete cryptographic stack control
-✅ **Delivers** reproducible, auditable FIPS builds
-✅ **Reduces** FedRAMP compliance timeline by 6-12 months
-✅ **Lowers** compliance costs by $100-300K
+- **System-wide FIPS enforcement** via kernel parameter and OpenSSL overlay, addressing the container-based limitations documented by Redpanda
+- **Reproducible builds** where the same `flake.lock` produces identical FIPS-enabled systems
+- **Complete dependency graph** auditable via `nix-store`, providing verifiable evidence for SC-13 compliance
+- **FIPS-compliant Console** buildable from source with BoringCrypto (FIPS-validated Go crypto)
 
-**This is a significant competitive advantage** - no other Redpanda deployment method can claim complete FIPS compliance across the entire stack.
+Remaining FedRAMP High gaps (3PAO assessment, SSP documentation, ConMon plan) are organizational and not addressed by the deployment method alone.
 
 ---
 
-**For Implementation Support**: See [COMPLIANCE_MATRIX.md](./COMPLIANCE_MATRIX.md) for detailed FedRAMP roadmap
+**For Implementation Details**: See [COMPLIANCE_MATRIX.md](../compliance/COMPLIANCE_MATRIX.md) for the FedRAMP roadmap
 
-**Document Version**: 1.0
-**Last Updated**: 2025-10-10
+**Document Version**: 1.1
+**Last Updated**: 2026-04-12
 **Next Review**: Upon Redpanda FIPS package updates

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This project provides automated Redpanda packaging for NixOS with a focus on maintainability, automation, and **multi-framework compliance** (SOC 2 Type II, NIST SP 800-161, ISO/IEC 27036).
+This project provides automated Redpanda packaging for NixOS with a focus on maintainability, automation, and **compliance-relevant security controls**.
 
 ### Key Design Principles
 
@@ -10,49 +10,55 @@ This project provides automated Redpanda packaging for NixOS with a focus on mai
 2. **Multi-Listener Support**: All services (Kafka API, Admin, Schema Registry, HTTP Proxy, RPC) support multiple listeners like the Helm chart
 3. **Automatic Updates**: `scripts/update.sh` script can package any Redpanda version automatically with integrated compliance artifacts
 4. **Nix-First**: Uses modern flakes and follows NixOS best practices
-5. **Compliance-First**: Built-in TLS enforcement, audit retention, and automated SBOM generation for 8 compliance frameworks
+5. **Security-First**: Built-in TLS enforcement, audit retention, and automated SBOM generation supporting multiple compliance frameworks
 6. **Multi-Architecture**: Native x86_64 and ARM64/aarch64 support (Apple Silicon ready)
 
 ## Architecture
 
 ```
-Three Build Approaches:
+Build Approaches:
 
-1. DEFAULT (99% of users):
+1. SOURCE (Default — SLSA Build L3):
+   Git Tag → fetchFromGitHub → Bazel Build in Nix Sandbox → NixOS Module
+       ↓          ↓                    ↓                        ↓
+   Tagged     SHA256           Hermetic compilation        systemd
+   release    verified         (13 pre-built deps,         + firewall
+   only                        fetch-nixify-build loop)
+   (~1 hr on 22 cores, ~4 hr on free-tier CI)
+
+   Adapted from redpanda-data/redpanda#29919 by randomizedcoder.
+
+2. DEB (Fast fallback):
    Redpanda deb → Extract → Nix Package → NixOS Module
         ↓           ↓           ↓              ↓
    Official    Unpack      Package        systemd
    package     binaries    to /nix/store  + firewall
-   (5-10 min)
+   (5 min)
 
-2. FIPS (FedRAMP High):
+3. FIPS (FedRAMP High — CMVP certified):
    Redpanda FIPS deb → Extract → Nix Package → NixOS Module
         ↓                ↓            ↓              ↓
    BoringCrypto     Unpack       Package        systemd
-   package          binaries     to /nix/store  + firewall
-   (5-10 min)
-
-3. BAZEL (NOT WORKING — kept for future focus):
-   GitHub Source → Bazel Build → Nix Package → NixOS Module
-   (Currently broken — do not use or document for users)
+   (NIST cert)      binaries     to /nix/store  + firewall
+   (5 min)
 ```
 
 ### File Descriptions
 
-- **`default.nix`**: Extracts binaries from official Redpanda deb packages (DEFAULT - fast for external users)
-- **`fips.nix`**: Extracts binaries from official Redpanda FIPS deb packages (for FedRAMP High compliance)
-- **`bazel.nix`**: NOT WORKING — Bazel source build kept for future focus only. Do not document for users.
+- **`source/build.nix`**: Builds Redpanda from source using Bazel in a Nix sandbox (DEFAULT — SLSA Build L3, full SBOM)
+- **`source/`**: Supporting files for source build (static lib derivations, bazel-deps, nixify rules, patches)
+- **`deb.nix`**: Fast fallback — extracts official Redpanda deb packages (5 min)
+- **`fips.nix`**: CMVP-certified FIPS 140-2 build from official FIPS deb packages
+- **`rpk.nix`**: Standalone rpk CLI built via Go's buildGoModule
+- **`oci.nix`**: Minimal OCI container image via dockerTools (~313 MB)
 - **`flake.nix`**: Modern Nix flake providing packages, apps, dev shell, and NixOS module
-- **`WHICH_BUILD.md`**: Decision tree to help users choose the right build approach
+- **`scripts/patch-module-bazel.py`**: Patches Redpanda's MODULE.bazel for Nix sandbox compatibility
+- **`scripts/gen-bazel-deps.py`**: Generates source/bazel-deps.nix from Bazel lockfile
+- **`docs/WHICH_BUILD.md`**: Decision tree to help users choose the right build approach
 - **`examples/`**: Production-ready configuration examples with compliance warnings
 - **`README.md`**: User-facing documentation
 
-**Working build approaches**:
-- **DEFAULT (default.nix)**: For 99% of users - fast binary deployment
-- **FIPS (fips.nix)**: For FedRAMP High - FIPS-validated binaries
-
-**NOT WORKING (kept for future focus)**:
-- **BAZEL (bazel.nix)**: Source builds from Bazel. Currently 100% broken. Do not reference in user-facing documentation. Will be restored when upstream build issues are resolved.
+**All build approaches are working.** See `docs/WHICH_BUILD.md` for the decision tree.
 
 ## Port Configuration System
 
@@ -116,17 +122,27 @@ All ports (9092, 9192, 9292, 9644, 8081, 8181, 8082, 8182) are automatically ext
 
 ## Build Process
 
-### How Default/FIPS Builds Work
+### How Source Builds Work (Default)
+
+Adapted from [redpanda-data/redpanda#29919](https://github.com/redpanda-data/redpanda/pull/29919) by [randomizedcoder](https://github.com/randomizedcoder).
+
+1. **Fetch Source**: `fetchFromGitHub` downloads tagged release source (SHA256 verified)
+2. **Patch Source**: `patch-module-bazel.py` removes dev extensions, adds Nix toolchain support
+3. **Pre-build Dependencies**: 13 C/C++ libraries built from nixpkgs (c-ares, krb5, openssl, etc.)
+4. **Repository Cache**: 258 archives pre-fetched into a content-addressed linkFarm
+5. **Fetch-Nixify-Build Loop**: Run `bazel fetch` → patchelf downloaded ELF binaries → retry (up to 3 passes)
+6. **Compile**: `bazel build //src/v/redpanda:redpanda` with `--spawn_strategy=local`
+7. **Install**: Copy binary, patchelf runtime library paths (krb5, openssl)
+
+Key: Nix sandbox provides hermeticity (no network during build). All inputs declared in the derivation.
+
+### How Deb/FIPS Builds Work (Fallback)
 
 1. **Fetch Deb Package**: Download official Redpanda deb from Cloudsmith CDN
 2. **Extract**: Use `dpkg-deb` to extract binaries from the deb
 3. **Patch**: Use `patchelf` to set the ELF interpreter to the bundled `ld.so`
 4. **Wrap**: Create a bash wrapper script that sets `LD_LIBRARY_PATH` to bundled libs
 5. **Install**: Copy binaries, libraries, and systemd service files to Nix store
-
-### Bazel Builds (NOT WORKING)
-
-`bazel.nix` is intended to build Redpanda from source using Bazel. It is currently 100% broken and kept only for future focus. Do not reference in user-facing documentation.
 
 ### Version Pinning Strategy
 
@@ -136,14 +152,20 @@ All ports (9092, 9192, 9292, 9644, 8081, 8181, 8082, 8182) are automatically ext
 
 ## Development Workflow
 
-### Building a Specific Version
+### Building
 
 ```bash
-# Update to a specific version (fetches deb, generates default.nix)
-./scripts/update.sh 26.1.2
+# Build from source (default — SLSA L3, ~1 hr)
+nix build .#redpanda
 
-# Or just build the current version
-nix build
+# Build from deb (fast fallback, ~5 min)
+nix build .#redpanda-deb
+
+# Build rpk CLI only (~2 min)
+nix build .#redpanda-rpk
+
+# Update to a specific version
+./scripts/update.sh 26.1.2
 
 # Validate flake
 nix flake check
@@ -165,16 +187,23 @@ When modifying the NixOS module:
 ### Update to New Redpanda Version
 
 ```bash
-# 1. Run the update script (validates tag, fetches deb, generates compliance artifacts)
+# 1. Run the update script (validates tag, updates deb/fips/rpk hashes)
 ./scripts/update.sh 26.1.2
 
-# 2. Build and test
-nix build
-./result/bin/redpanda --version
+# 2. Regenerate source build deps (requires network — run outside sandbox)
+python3 scripts/gen-bazel-deps.py \
+  --lockfile <v26.1.2 MODULE.bazel.lock> \
+  --bcr $(nix-build --no-out-link -E 'with import <nixpkgs> {}; callPackage ./source/bcr.nix {}') \
+  --module-bazel <v26.1.2 MODULE.bazel> \
+  > source/bazel-deps.nix
 
-# 3. Commit changes
-git add default.nix flake.nix compliance/
-git commit -m "Update to Redpanda v26.1.2"
+# 3. Build and test
+nix build .#redpanda-deb && ./result/bin/redpanda --version
+nix build .#redpanda-rpk && ./result/bin/rpk version
+
+# 4. Commit changes
+git add deb.nix fips.nix rpk.nix flake.nix source/bazel-deps.nix source/MODULE.bazel.lock.nix compliance/
+git commit -m "update to Redpanda v26.1.2"
 ```
 
 ### Add Support for New Listener Type
@@ -276,221 +305,50 @@ services.redpanda = {
 - **Security**: Module includes systemd hardening (NoNewPrivileges, ProtectSystem, etc.)
 - **Architecture**: x86_64-linux supported for deb packages
 
-## Multi-Framework Compliance
+## Compliance
 
-This project is designed to meet multiple compliance frameworks:
+This package provides technical controls that support multiple compliance frameworks. Organizational controls (audits, training, policies) are deployer responsibility. See [COMPLIANCE_MATRIX.md](./compliance/COMPLIANCE_MATRIX.md) for the authoritative control mapping.
 
-### Compliance Status
+### Compliance Documentation
 
-Percentages reflect implemented, verifiable controls as of 2026-04-10. See [COMPLIANCE_MATRIX.md](./compliance/COMPLIANCE_MATRIX.md) for detailed gap analysis.
+- **[COMPLIANCE_MATRIX.md](./compliance/COMPLIANCE_MATRIX.md)** — Master control mapping across all frameworks
+- **[C-SCRM_PLAN.md](./compliance/C-SCRM_PLAN.md)** — NIST SP 800-161 supply chain risk management
+- **[FBI_CJIS_COMPLIANCE.md](./compliance/FBI_CJIS_COMPLIANCE.md)** — FBI CJIS Security Policy analysis and implementation roadmap
+- **[INCIDENT_RESPONSE_PLAN.md](./compliance/INCIDENT_RESPONSE_PLAN.md)** — Incident response procedures
+- **[SUPPLIER_ASSESSMENT.md](./compliance/SUPPLIER_ASSESSMENT.md)** — Supplier security assessment
+- **[SUPPLIER_AGREEMENT_TEMPLATE.md](./compliance/SUPPLIER_AGREEMENT_TEMPLATE.md)** — ISO 27036 supplier agreement template
 
-| Framework | Implemented | Key Gap |
-|-----------|-------------|---------|
-| **SOC 2 Type II** | ~95% | Audit evidence collection automated but not continuously running |
-| **FBI CJIS v6.0 (Dec 2024)** | ~90% | `cjisCompliant` preset available; MFA still deployer-dependent |
-| **NIST SP 800-161** | ~85% | SBOMs distributed via `compliance/current/` and GitHub Releases |
-| **ISO/IEC 27036** | ~75% | Supplier agreement template available; formal signing required |
-| **FedRAMP High** | ~58% | 3PAO assessment and SSP required (organizational) |
-| **DoD SBOM Management (Jan 2024)** | ~85% | SBOMs distributed; continuous scanning via weekly workflow |
-| **NIST CSF 2.0 (Feb 2024)** | ~75% | Incident response plan and CVE scanning implemented |
-| **Anduril NixOS STIG (Dec 2024)** | ~60% | Structured audit logging via `auditLog` option |
+### Key Technical Controls
 
-**Phase 1 Achievements (2025-10-10)**:
-1. Supply chain event logging (NIST 800-161 SR-5, SR-7)
-2. SBOM aggregation (DoD Requirement 4)
-3. Automated vulnerability alerting (DoD Requirement 5)
-4. SBOM signing with Sigstore/cosign (supply chain integrity)
-5. MFA enforcement option (FBI CJIS 5.5.2.2)
-6. C-SCRM Implementation Plan (NIST 800-161 SR-1)
-7. Supplier Security Assessment (NIST 800-161 SR-5, ISO 27036)
+- **Reproducible builds**: Same inputs produce identical outputs (SHA256 verified)
+- **Immutable infrastructure**: `/nix/store` is read-only, packages cannot be modified post-build
+- **SLSA Build L3** (self-assessed): Source build via hermetic Nix sandbox
+- **FIPS 140-2**: Available via `redpanda-fips` package (CMVP-certified BoringCrypto)
+- **SBOM generation**: CycloneDX/SPDX via sbomnix, integrated in `scripts/update.sh`
+- **systemd hardening**: `NoNewPrivileges=true`, `ProtectSystem=strict`, `PrivateTmp=true`
+- **Audit trail**: Git history provides complete change log; 365-day journal retention option
 
-**Key Documentation**:
-- **[COMPLIANCE_MATRIX.md](./compliance/COMPLIANCE_MATRIX.md)** - Master compliance analysis (7 frameworks, architecture, ROI)
-- **[C-SCRM_PLAN.md](./compliance/C-SCRM_PLAN.md)** - C-SCRM implementation plan (NIST 800-161)
-- **[SUPPLIER_ASSESSMENT.md](./compliance/SUPPLIER_ASSESSMENT.md)** - Security assessment of all suppliers
+### SBOM Generation
 
-### SOC 2 Type II Compliance (✅ Complete)
-
-**Security Controls**:
-- **CC6.1 - Logical Access**: Least privilege user/group (`redpanda`), systemd hardening
-- **CC6.6 - Logical Access**: Firewall rules automatically managed, declarative configuration
-- **CC7.2 - System Operations**: Reproducible builds with cryptographic verification (SHA256)
-- **CC8.1 - Change Management**: All changes in git with audit trail, atomic rollbacks
-
-**Implementation Details**:
-1. **Cryptographic Verification**: Every package has SHA256 hash in `default.nix`
-2. **Reproducible Builds**: Same inputs → identical outputs (byte-for-byte)
-3. **Immutable Infrastructure**: `/nix/store` is read-only, packages cannot be modified post-build
-4. **Audit Trail**: Git history provides complete change log
-5. **Automated Testing**: `nix flake check` validates configuration before deployment
-6. **Rollback Capability**: `nixos-rebuild switch --rollback` for instant recovery
-
-### NIST SP 800-161 Compliance (~70%)
-
-**Cybersecurity Supply Chain Risk Management**:
-- **SR-3: Supply Chain Controls**: Reproducible builds, cryptographic verification
-- **SR-4: Provenance**: Complete dependency tracking via `/nix/store`
-- **SR-9: Tamper Resistance**: Immutable package storage
-- **SR-10: Inspection**: `nix-store --verify --check-contents`
-- **SR-11: Component Authenticity**: SHA256 hashes, reproducible builds
-
-**SBOM Generation** (Software Bill of Materials):
 ```bash
-# RECOMMENDED: Using sbomnix (TII) - most comprehensive
-sbomnix $(nix-build default.nix) --sbom cyclonedx --output redpanda-sbom.json
+# Using sbomnix (recommended for DoD/NIST — supports CycloneDX, SPDX, SLSA provenance, CVE scanning)
+sbomnix $(nix build .#redpanda --print-out-paths) --sbom cyclonedx --output redpanda-sbom.json
+sbomnix $(nix build .#redpanda --print-out-paths) --provenance slsa --output redpanda-provenance.json
+vulnxscan $(nix build .#redpanda-deb --print-out-paths) --sbom redpanda-sbom.json --output vulns.csv
 
-# SLSA v1.0 Provenance Attestation (DoD requirement)
-sbomnix $(nix-build default.nix) --provenance slsa --output redpanda-provenance.json
-
-# Vulnerability Scanning (automated CVE detection)
-vulnxscan $(nix-build default.nix) --sbom redpanda-sbom.json --output vulns.csv
-
-# Alternative: Using bombon (CycloneDX v1.5)
-nix run github:nikstur/bombon -- $(nix-build default.nix)
+# Alternative: bombon (CycloneDX only)
+nix run github:nikstur/bombon -- $(nix build .#redpanda-deb --print-out-paths)
 ```
-
-**Tool Comparison**:
-
-| Feature | sbomnix (TII) | bombon | Recommendation |
-|---------|---------------|--------|----------------|
-| CycloneDX | ✅ | ✅ | Both work |
-| SPDX | ✅ | ❌ | **sbomnix** for DoD |
-| SLSA Provenance | ✅ | ❌ | **sbomnix** for DoD |
-| CVE Scanning | ✅ | ❌ | **sbomnix** for security |
-| Dependency Graphs | ✅ | ❌ | **sbomnix** for audits |
-
-**Recommendation**: Use **sbomnix** for DoD/NIST compliance (SLSA provenance + CVE scanning).
-
-**✅ All Gaps Resolved**:
-- ✅ Formal C-SCRM implementation plan: [C-SCRM_PLAN.md](./compliance/C-SCRM_PLAN.md)
-- ✅ Documented supplier assessment: [SUPPLIER_ASSESSMENT.md](./compliance/SUPPLIER_ASSESSMENT.md)
-- ✅ SBOM generation automated: Integrated in `scripts/update.sh` with event logging
-
-### ISO/IEC 27036 Compliance (🟡 80%)
-
-**Supplier Relationship Management**:
-- **Clause 6.4 - Asset Management**: `/nix/store` tracking
-- **Clause 6.7 - Operations Management**: systemd + Nix
-- **Clause 6.9 - Access Control**: systemd hardening
-- **Clause 6.10 - Cryptography**: SHA256 verification
-- **Clause 7.2 - Managing Changes**: Git-based change control
-
-**Addressed**:
-- ✅ Supplier Security Requirements: [SUPPLIER_ASSESSMENT.md](./compliance/SUPPLIER_ASSESSMENT.md)
-- ✅ Supplier Relationship Management: Documented in supplier assessment
-- ✅ Continuous Monitoring: Automated via GitHub Actions
-
-**Remaining Gaps** (Optional for higher compliance):
-- Formal Information Security Policy for Suppliers (template available in assessment)
-- Supplier Agreement Template (can be derived from security requirements)
-
-### NIST CSF 2.0 - Govern Function (🟡 60% - Released Feb 2024)
-
-**New in CSF 2.0**: Added 6th core function "GOVERN" (GV) for cybersecurity risk management strategy
-
-**GV.SC - Cybersecurity Supply Chain Risk Management** (10 subcategories):
-
-| Control | Description | Status | Gap |
-|---------|-------------|--------|-----|
-| GV.SC-01 | Supply chain risk mgmt process established | 🟡 Partial | Need formal SCRM policy doc |
-| GV.SC-02 | Suppliers identified | ✅ Complete | `flake.lock` tracks all deps |
-| GV.SC-04 | Suppliers assessed prior to acquisition | 🟡 Partial | nixpkgs governance (informal) |
-| GV.SC-05 | Supply chain events communicated | ❌ Gap | Need supply chain event logging |
-| GV.SC-06 | Security practices integrated | ✅ Complete | Reproducible builds, SBOM |
-| GV.SC-07 | Risk response plans established | ❌ Gap | Need incident response plan |
-| GV.SC-08 | Security practices shared | ✅ Complete | Documentation + git history |
-| GV.SC-09 | Assurance processes implemented | ✅ Complete | `nix-store --verify` |
-| GV.SC-10 | Supply chain risks monitored | 🟡 Partial | Need automated CVE monitoring |
-
-**Enhanced (70% → 70%)**:
-- ✅ GV.SC-05: Supply chain event logging implemented
-- ✅ GV.SC-10: Automated CVE monitoring operational
-- ❌ GV.SC-07: Incident response plan (remains gap - see [C-SCRM_PLAN.md §6](./compliance/C-SCRM_PLAN.md) for procedures)
-
-### DoD SBOM Management (🟡 70% - NSA Jan 2024 Guidance)
-
-**Requirements for National Security Systems (NSS)**:
-
-| Requirement | Status | Implementation |
-|------------|--------|----------------|
-| CycloneDX or SPDX format (JSON/XML) | ✅ Complete | sbomnix supports both |
-| SBOM enrichment (CVE, licenses) | 🟡 Partial | sbomnix enrichment available |
-| Hash capture for components | ✅ Complete | SHA256 in `/nix/store` |
-| SBOM aggregation | ❌ Gap | Not automated |
-| Vulnerability alerting | ❌ Gap | sbomnix vulnxscan available |
-| **Provenance tracking (SLSA)** | ❌ Gap | **sbomnix provenance feature** |
-
-**Tooling available (~50% implemented)**:
-1. SLSA provenance generation: Available via `scripts/update.sh` (must be run)
-2. Vulnerability scanning: Available via sbomnix vulnxscan (must be run)
-3. SBOM enrichment: Documented in [C-SCRM_PLAN.md](./compliance/C-SCRM_PLAN.md)
-4. SBOM signing: Sigstore/cosign integration available (must be run)
 
 Note: SBOM artifacts are generated when `scripts/update.sh` runs but are gitignored. They are not shipped with the package.
 
-### Anduril NixOS STIG (🟢 40% - Released Dec 2024)
+### FedRAMP Gaps
 
-**DoD Security Technical Implementation Guide** - 104 controls (11 CAT I, 92 CAT II, 1 CAT III)
+Remaining FedRAMP gaps are organizational (3PAO assessment, System Security Plan, continuous monitoring). The `redpanda-fips` package provides the technical foundation. See COMPLIANCE_MATRIX.md Section 8 for details.
 
-**Applicability Note**: This is an application package, not a full OS. Only service-level controls apply.
+### FIPS on NixOS
 
-**Applicable Controls**:
-
-| Category | Status | Implementation |
-|----------|--------|----------------|
-| **AU (Audit)** | 🟡 Partial | systemd journal only |
-| **SC (Cryptography)** | 🟡 Partial | TLS available but not enforced |
-| **AC (Access Control)** | ✅ Complete | Least privilege, systemd hardening |
-| **CM (Config Management)** | ✅ Complete | Declarative configuration |
-| **IA (Auth)** | N/A | Handled by Redpanda internally |
-
-**Enhancement Opportunities**:
-1. Add structured audit logging (AU controls)
-2. Add `enforceTLS` option (SC-8 transmission confidentiality)
-3. Add log directory permissions enforcement (V-268117)
-
-**Note**: Full STIG compliance requires OS-level controls (handled by NixOS STIG baseline, not this package).
-
-### FedRAMP High Gaps (🔴 Requires Significant Work)
-
-**Critical Blocking Issues**:
-1. **FIPS 140-2 Cryptography**: Must use FIPS-validated crypto modules (SC-13)
-2. **3PAO Assessment**: Requires independent third-party audit ($150-500K)
-3. **Continuous Monitoring**: Monthly security deliverables to FedRAMP PMO
-4. **System Security Plan**: 500-1000 page documentation
-5. **Timeline**: 18-24 months to achieve ATO (Authority to Operate)
-
-**See Compliance Documentation**:
-- [COMPLIANCE_MATRIX.md](./compliance/COMPLIANCE_MATRIX.md) - Detailed gap analysis across all frameworks
-- [C-SCRM_PLAN.md](./compliance/C-SCRM_PLAN.md) - NIST SP 800-161 implementation plan
-
-### Change Control Process
-1. All changes committed to git (audit trail)
-2. `scripts/update.sh` documents version updates with SHA256 verification
-3. `flake.lock` pins exact dependency versions
-4. NixOS module validates configuration syntax
-5. systemd service config is declarative and version-controlled
-
-### Access Controls
-- Service runs as non-root `redpanda` user
-- systemd hardening: `NoNewPrivileges=true`, `ProtectSystem=strict`, `PrivateTmp=true`
-- Read-write access restricted to `dataDir` only via `ReadWritePaths`
-- Port access controlled via firewall integration
-
-## Advanced Topics
-
-### Redpanda FIPS on NixOS
-
-**Critical Advantage**: Nix-based deployment **eliminates Redpanda's container FIPS limitations**:
-
-- ✅ **Full system-wide FIPS** (vs. partial in Kubernetes)
-- ✅ **Console FIPS-compliant** (build from source with FIPS Go crypto)
-- ✅ **Complete cryptographic stack control** (no hidden container dependencies)
-- ✅ **Reproducible FIPS builds** (same `flake.lock` → identical FIPS system)
-
-**Documentation**: See [REDPANDA_FIPS_NIXOS.md](./docs/REDPANDA_FIPS_NIXOS.md) for complete implementation guide.
-
-**Status**: With FIPS path fix applied, FIPS-validated cryptography is functional. FedRAMP High is ~55% implemented — remaining gaps are organizational (3PAO assessment, SSP documentation, ConMon plan).
+Nix-based FIPS deployment provides system-level FIPS enforcement rather than container-level. See [REDPANDA_FIPS_NIXOS.md](./docs/REDPANDA_FIPS_NIXOS.md) for implementation guide.
 
 ## CI/CD Automation
 
@@ -504,7 +362,7 @@ This project includes comprehensive GitHub Actions workflows for automated quali
 
 **Process**:
 1. Query GitHub API for latest Redpanda release
-2. Compare with current version in `default.nix`
+2. Compare with current version in `deb.nix`
 3. If update available:
    - Run `scripts/update.sh` to generate package (validates tag, fetches deb, generates compliance artifacts)
    - Generate compliance artifacts (SBOM, provenance, CVE scan)
@@ -576,12 +434,15 @@ Add a final step to `update-redpanda.yml`:
 
 ## Completed Features
 
-- [x] Patchelf + wrapper packaging from official deb packages
-- [x] FIPS 140-2 package support (redpanda-fips)
+- [x] Bazel-from-source build as default (SLSA Build L3, self-assessed)
+- [x] Deb extraction fallback (fast, 5 min)
+- [x] FIPS 140-2 package support (redpanda-fips, CMVP certified)
+- [x] Standalone rpk CLI (buildGoModule)
+- [x] OCI container images (dockerTools)
 - [x] Version tag validation in update.sh
 - [x] TLS enforcement validation (enforceTLS option)
 - [x] Automated SBOM generation (CycloneDX + SPDX)
-- [x] SLSA v1.0 provenance attestation (DoD requirement)
+- [x] SLSA Build L3 provenance (hermetic Nix sandbox)
 - [x] Automated vulnerability scanning (CVE detection)
 - [x] CJIS audit retention (365-day configurable)
 - [x] Cluster configuration examples with compliance warnings
@@ -589,8 +450,10 @@ Add a final step to `update-redpanda.yml`:
 
 ## Future Enhancements
 
-- [ ] Fix Bazel source build (bazel.nix - currently 100% broken)
+- [ ] PGO support for source builds — apply Redpanda's `.profdata` via `--fdo_optimize` if published as release artifacts (see `docs/WHICH_BUILD.md` PGO FAQ)
 - [ ] TLS certificate generation/management helpers
+- [ ] Formal SLSA conformance program certification (third-party verification)
+- [ ] Self-hosted GitHub Actions runner for faster source builds
 
 ## Resources
 
@@ -600,10 +463,9 @@ Add a final step to `update-redpanda.yml`:
 - [Nix Flakes](https://nixos.wiki/wiki/Flakes) - Flake format and usage
 
 ### Internal Documentation
-- [COMPLIANCE_MATRIX.md](./compliance/COMPLIANCE_MATRIX.md) - Master compliance analysis (7 frameworks, architecture, ROI)
+- [COMPLIANCE_MATRIX.md](./compliance/COMPLIANCE_MATRIX.md) - Master compliance control mapping
 - [C-SCRM_PLAN.md](./compliance/C-SCRM_PLAN.md) - NIST SP 800-161 implementation
 - [SUPPLIER_ASSESSMENT.md](./compliance/SUPPLIER_ASSESSMENT.md) - Supplier security assessment
-- [SOC2_COMPLIANCE.md](./compliance/SOC2_COMPLIANCE.md) - SOC 2 Type II control mapping
 - [FBI_CJIS_COMPLIANCE.md](./compliance/FBI_CJIS_COMPLIANCE.md) - CJIS Security Policy analysis
 - [REDPANDA_FIPS_NIXOS.md](./docs/REDPANDA_FIPS_NIXOS.md) - FIPS 140-2 implementation guide
 - [INCIDENT_RESPONSE_PLAN.md](./compliance/INCIDENT_RESPONSE_PLAN.md) - Incident response procedures

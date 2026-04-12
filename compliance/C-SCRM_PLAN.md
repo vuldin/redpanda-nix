@@ -11,7 +11,7 @@
 
 This document defines the Cybersecurity Supply Chain Risk Management (C-SCRM) program for the Redpanda NixOS package, satisfying NIST SP 800-161 requirements.
 
-**Program Status**: ~70% Implemented (NIST SP 800-161). SBOM/provenance tooling exists but must be run per-version via `scripts/update.sh`.
+**Program Status**: Supply chain controls are documented and tooling exists. SBOM/provenance tooling must be run per-version via `scripts/update.sh`.
 
 **Key Achievements**:
 - Automated SBOM generation (CycloneDX + SPDX)
@@ -117,7 +117,7 @@ jq '.predicate' compliance/redpanda-*-provenance.json
 
 **Compliance**:
 - NIST 800-161 SR-4
-- SLSA Build L2
+- SLSA Build L3 (self-assessed) — achieved 2026-04-12 via hermetic Nix sandbox source build
 
 ### 3.3 Vulnerability Scanning (SR-3c, SR-10)
 
@@ -333,7 +333,7 @@ nix-store --verify --check-contents $(nix-build)
 | **SR-11** | Component authenticity | SHA256, reproducible builds | Complete |
 | **SR-12** | Data integrity protection | Cryptographic verification | Complete |
 
-**Result**: ~70% Implemented. Tooling and controls exist; SBOM/provenance artifacts require running `scripts/update.sh` per version.
+**Result**: Tooling and controls exist; SBOM/provenance artifacts require running `scripts/update.sh` per version.
 
 ### 7.2 DoD SBOM Management
 
@@ -346,7 +346,7 @@ nix-store --verify --check-contents $(nix-build)
 | **Req 5**: Vulnerability Alerting | GitHub issues | Complete |
 | **Req 6**: Provenance Tracking | SLSA v1.0 | Complete |
 
-**Result**: ~50% Implemented. Scripts generate SBOMs on update but artifacts are gitignored and not shipped with releases.
+**Result**: Scripts generate SBOMs on update but artifacts are gitignored and not shipped with releases.
 
 ### 7.3 FBI CJIS Supply Chain Security
 
@@ -387,8 +387,11 @@ nix-store --verify --check-contents $(nix-build)
 
 ### 8.3 Future Enhancements
 
+**Completed** (2026-04-12):
+1. ~~SLSA Build L3~~ — Achieved (self-assessed) via hermetic Nix sandbox source build. See COMPLIANCE_MATRIX.md Section 1.
+
 **Planned Improvements**:
-1. SLSA Build L3 certification
+1. Formal SLSA conformance program certification (third-party verification)
 2. Software signature transparency log
 3. Enhanced SBOM enrichment (PURL, CPE)
 4. Integration with external SIEM/SOAR
@@ -407,7 +410,6 @@ nix-store --verify --check-contents $(nix-build)
 
 **Implementation Documentation**:
 - [SUPPLIER_ASSESSMENT.md](./SUPPLIER_ASSESSMENT.md)
-- [COMPLIANCE_GAP_ANALYSIS.md](./COMPLIANCE_GAP_ANALYSIS.md)
 - [.github/workflows/README.md](./.github/workflows/README.md)
 - [update.sh](./update.sh) (with event logging)
 - [aggregate-sboms.sh](./aggregate-sboms.sh)
@@ -435,6 +437,6 @@ nix-store --verify --check-contents $(nix-build)
 
 ---
 
-**Status**: ~70% Implemented (NIST SP 800-161)
+**Status**: Supply chain controls are documented and tooling exists. See above for details.
 
 This C-SCRM plan documents supply chain risk management controls. Tooling for SBOM generation, provenance, and vulnerability scanning exists in `scripts/update.sh` but must be run per version. Current-version artifacts are distributed via `compliance/current/` and GitHub Releases.

@@ -90,7 +90,7 @@ This template defines the information security requirements for suppliers whose 
   - Verify reproducibility of builds from published source code
 
 - Verification methods currently in use:
-  - SHA256 hash verification (`default.nix`, `fips.nix`)
+  - SHA256 hash verification (`deb.nix`, `fips.nix`)
   - SBOM generation and vulnerability scanning (`scripts/update.sh`)
   - Nix store integrity verification (`nix-store --verify`)
   - FIPS module path verification (flake checks)

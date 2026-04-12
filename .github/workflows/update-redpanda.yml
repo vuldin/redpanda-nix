@@ -39,8 +39,8 @@ jobs:
       - name: Check for updates
         id: check
         run: |
-          # Get current version from default.nix
-          CURRENT_VERSION=$(grep 'version = ' default.nix | head -1 | cut -d'"' -f2)
+          # Get current version from deb.nix
+          CURRENT_VERSION=$(grep 'version = ' deb.nix | head -1 | cut -d'"' -f2)
           echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           echo "Current version: $CURRENT_VERSION"
 
@@ -109,13 +109,13 @@ jobs:
 
       - name: Commit changes
         run: |
-          git add default.nix fips.nix flake.nix compliance/
+          git add deb.nix fips.nix flake.nix compliance/
           git commit -m "Update Redpanda to v${{ needs.check-update.outputs.new_version }}
 
           Automated update from ${{ needs.check-update.outputs.current_version }} to ${{ needs.check-update.outputs.new_version }}
 
           Changes:
-          - Updated package definition (default.nix)
+          - Updated package definition (deb.nix)
           - Updated flake version reference
           - Generated compliance artifacts:
             - CycloneDX SBOM
@@ -147,7 +147,7 @@ jobs:
           This PR updates the Redpanda package to the latest release.
 
           #### Package Updates
-          - ✅ Updated \`default.nix\` with new version and SHA256 hashes
+          - ✅ Updated \`deb.nix\` with new version and SHA256 hashes
           - ✅ Updated \`flake.nix\` version reference
           - ✅ Successfully built package with \`nix build\`
 

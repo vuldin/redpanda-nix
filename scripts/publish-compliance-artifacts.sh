@@ -9,9 +9,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPLIANCE_DIR="${SCRIPT_DIR}/compliance"
 CURRENT_DIR="${COMPLIANCE_DIR}/current"
 
-# Auto-detect version from default.nix if not provided
+# Auto-detect version from deb.nix if not provided
 get_current_version() {
-    grep 'version = ' "${SCRIPT_DIR}/default.nix" | head -1 | cut -d'"' -f2
+    grep 'version = ' "${SCRIPT_DIR}/deb.nix" | head -1 | cut -d'"' -f2
 }
 
 main() {

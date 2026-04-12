@@ -14,7 +14,7 @@ This directory contains automated workflows for the Redpanda NixOS package.
 
 **What it does**:
 1. Checks GitHub API for latest Redpanda release
-2. Compares with current version in `default.nix`
+2. Compares with current version in `deb.nix`
 3. If update available:
    - Runs `update.sh` to generate new package
    - Generates compliance artifacts (SBOM, provenance, vulnerability scan)

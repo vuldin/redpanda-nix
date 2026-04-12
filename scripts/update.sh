@@ -81,6 +81,77 @@ EOF
     echo "✓ Logged event: $event_type (version $version)"
 }
 
+# Update source build hash in flake.nix
+update_source_hashes() {
+    local version="$1"
+    echo "Computing source tarball hash for v${version}..."
+
+    local src_hash
+    if command -v nix-prefetch-url &>/dev/null; then
+        local nix_hash
+        nix_hash=$(nix-prefetch-url --unpack "https://github.com/redpanda-data/redpanda/archive/refs/tags/v${version}.tar.gz" 2>/dev/null)
+        src_hash=$(nix hash to-sri --type sha256 "$nix_hash" 2>/dev/null | sed 's/^warning:.*//')
+    else
+        echo "Warning: nix-prefetch-url not available, skipping source hash update" >&2
+        return 0
+    fi
+
+    if [ -n "$src_hash" ]; then
+        sed -i "s|srcHash = \"sha256-.*\"|srcHash = \"${src_hash}\"|" "${SCRIPT_DIR}/flake.nix"
+        echo "✓ Updated source hash in flake.nix: ${src_hash}"
+        log_supply_chain_event "source_hash_updated" "$version" "success" "Source tarball SHA256 (SRI)"
+    else
+        echo "Warning: Could not compute source hash" >&2
+    fi
+}
+
+# Update rpk.nix version and hashes
+update_rpk() {
+    local version="$1"
+    local rpk_file="${SCRIPT_DIR}/rpk.nix"
+
+    if [ ! -f "$rpk_file" ]; then
+        echo "Warning: rpk.nix not found, skipping rpk update" >&2
+        return 0
+    fi
+
+    echo "Updating rpk.nix version to ${version}..."
+    sed -i "s/version = \"[0-9.]*\"/version = \"${version}\"/" "$rpk_file"
+
+    # rpk uses the same source tarball as the server, so the src hash matches flake.nix srcHash
+    # But the vendorHash (Go module hash) changes per version and must be recomputed
+    echo "Computing rpk vendorHash (this will attempt a build with a dummy hash)..."
+
+    # Set a known-bad hash to trigger the "got:" error
+    sed -i 's/vendorHash = "sha256-[^"]*"/vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="/' "$rpk_file"
+
+    local build_output
+    build_output=$(nix build "${SCRIPT_DIR}#redpanda-rpk" 2>&1 || true)
+    local got_hash
+    got_hash=$(echo "$build_output" | grep "got:" | sed 's/.*got:\s*//' | tr -d ' ')
+
+    if [ -n "$got_hash" ]; then
+        sed -i "s|vendorHash = \"sha256-.*\"|vendorHash = \"${got_hash}\"|" "$rpk_file"
+        echo "✓ Updated rpk.nix vendorHash: ${got_hash}"
+    else
+        echo "Warning: Could not compute rpk vendorHash. Manual update needed." >&2
+        echo "  Run: nix build .#redpanda-rpk 2>&1 | grep 'got:'" >&2
+        # Restore the previous hash so the file isn't left with the dummy
+        sed -i 's/vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="/vendorHash = "sha256-TODO-run-nix-build-to-get-hash"/' "$rpk_file"
+    fi
+
+    # Also update the source hash to match the flake.nix srcHash
+    local current_src_hash
+    current_src_hash=$(grep 'srcHash = ' "${SCRIPT_DIR}/flake.nix" | head -1 | sed 's/.*"\(sha256-[^"]*\)".*/\1/')
+    if [ -n "$current_src_hash" ]; then
+        sed -i "s|hash = \"sha256-[^\"]*\"|hash = \"${current_src_hash}\"|" "$rpk_file"
+        echo "✓ Updated rpk.nix source hash to match flake.nix"
+    fi
+
+    echo "✓ Updated rpk.nix to version ${version}"
+    log_supply_chain_event "rpk_updated" "$version" "success" "rpk CLI version and hashes"
+}
+
 # Main update logic
 main() {
     local version="${1:-}"
@@ -109,8 +180,8 @@ main() {
     echo "Fetching SHA256 for DEB package..."
     local sha256=$(get_sha256 "$deb_url")
 
-    # Generate default.nix
-    cat > "${SCRIPT_DIR}/default.nix" << 'EOF'
+    # Generate deb.nix
+    cat > "${SCRIPT_DIR}/deb.nix" << 'EOF'
 { lib
 , stdenv
 , fetchurl
@@ -207,10 +278,10 @@ INNEREOF
 EOF
 
     # Replace placeholders with actual values
-    sed -i "s/VERSION_PLACEHOLDER/${version}/g" "${SCRIPT_DIR}/default.nix"
-    sed -i "s/SHA256_PLACEHOLDER/${sha256}/g" "${SCRIPT_DIR}/default.nix"
+    sed -i "s/VERSION_PLACEHOLDER/${version}/g" "${SCRIPT_DIR}/deb.nix"
+    sed -i "s/SHA256_PLACEHOLDER/${sha256}/g" "${SCRIPT_DIR}/deb.nix"
 
-    echo "✓ Generated default.nix for version ${version}"
+    echo "✓ Generated deb.nix for version ${version}"
 
     # Update flake.nix if it exists
     if [ -f "${SCRIPT_DIR}/flake.nix" ]; then
@@ -234,10 +305,16 @@ EOF
 
     log_supply_chain_event "fips_package_generated" "$version" "success" "FIPS supplement DEB from Cloudsmith (x86_64)"
 
+    # Update source build and rpk hashes
+    echo ""
+    echo "Updating source build and rpk hashes..."
+    update_source_hashes "$version"
+    update_rpk "$version"
+
     echo ""
     echo "Packages updated successfully!"
     echo "Version: ${version}"
-    echo "SHA256 (base): ${sha256}"
+    echo "SHA256 (deb): ${sha256}"
     echo "SHA256 (FIPS): ${fips_sha256}"
     echo ""
 
@@ -245,8 +322,13 @@ EOF
     generate_compliance_artifacts "$version"
 
     echo "You can now build the packages with:"
-    echo "  nix build          # default package"
+    echo "  nix build .#redpanda-deb   # deb package (fast)"
+    echo "  nix build .#redpanda-rpk   # rpk CLI"
     echo "  nix build .#redpanda-fips  # FIPS package"
+    echo "  nix build .#redpanda       # source build (requires bazel-deps.nix regeneration)"
+    echo ""
+    echo "NOTE: source/bazel-deps.nix and source/MODULE.bazel.lock.nix must be regenerated"
+    echo "manually for source builds. See CLAUDE.md 'Update to New Redpanda Version'."
 }
 
 # Function to generate fips.nix from template
@@ -458,7 +540,7 @@ generate_compliance_artifacts() {
 
     echo "Building package for compliance scanning..."
     local build_result
-    if ! build_result=$(nix-build "${SCRIPT_DIR}/default.nix" 2>&1); then
+    if ! build_result=$(nix-build "${SCRIPT_DIR}/deb.nix" 2>&1); then
         echo "⚠️  Build failed. Skipping compliance artifacts."
         echo "   Build the package manually and run compliance generation later."
         return

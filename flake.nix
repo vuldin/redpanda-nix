@@ -14,27 +14,52 @@
           config.allowUnfree = true;
         };
 
-        # Default: Fast deb package extraction (for external users)
-        redpanda = pkgs.callPackage ./default.nix { };
+        # Default: Bazel-from-source build (SLSA Build L3, full SBOM)
+        # Adapted from https://github.com/redpanda-data/redpanda/pull/29919
+        # by randomizedcoder. See source/build.nix for details.
+        redpanda = pkgs.callPackage ./source/build.nix {
+          # Version and source hash — updated by scripts/update.sh
+          # These must match a tagged Redpanda release (never main/HEAD)
+          version = "26.1.2";
+          srcHash = "sha256-dY6orYo5t+l0xKEqnCrXiaQ/57rqJnn9RAP67EgDi98=";
+        };
 
-        # FIPS: FIPS 140-2 compliant build (for FedRAMP High)
+        # Deb: Fast deb package extraction (5 min fallback)
+        redpanda-deb = pkgs.callPackage ./deb.nix { };
+
+        # FIPS: CMVP-certified FIPS 140-2 build (for FedRAMP High)
+        # Uses Redpanda's official FIPS deb — building from source loses
+        # NIST CMVP certification. See docs/WHICH_BUILD.md.
         redpanda-fips = pkgs.callPackage ./fips.nix { };
 
-        # Bazel: Source builds (for Redpanda employees/development)
-        redpanda-bazel = pkgs.callPackage ./bazel.nix { };
+        # Standalone rpk CLI (Go, independent from the C++ server build)
+        redpanda-rpk = pkgs.callPackage ./rpk.nix { };
+
+        # OCI container images (pipe to `docker load`)
+        # Uses deb package for now (source build produces same binary format)
+        redpanda-image = pkgs.callPackage ./oci.nix {
+          redpandaDrv = redpanda-deb;
+        };
+        redpanda-image-debug = pkgs.callPackage ./oci.nix {
+          redpandaDrv = redpanda-deb;
+          debug = true;
+        };
       in
       {
         packages = {
           default = redpanda;
-          redpanda = redpanda;
+          inherit redpanda;
+          redpanda-deb = redpanda-deb;
           redpanda-fips = redpanda-fips;
-          redpanda-bazel = redpanda-bazel;
+          redpanda-rpk = redpanda-rpk;
+          redpanda-image = redpanda-image;
+          redpanda-image-debug = redpanda-image-debug;
         };
 
         apps = {
           default = {
             type = "app";
-            program = "${redpanda}/bin/redpanda";
+            program = "${redpanda-deb}/bin/redpanda";
           };
 
           update = {
@@ -47,7 +72,7 @@
 
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
-            redpanda
+            redpanda-deb
             curl
             jq
           ];
@@ -173,7 +198,9 @@
         with lib;
         let
           cfg = config.services.redpanda;
-          redpandaPkg = pkgs.callPackage ./default.nix { };
+          # Default to deb package for the NixOS module (fast, reliable).
+          # Users can override with: services.redpanda.package = pkgs.callPackage ./source/build.nix { ... };
+          redpandaPkg = pkgs.callPackage ./deb.nix { };
 
 
           # Function to extract port from listener configuration
@@ -237,6 +264,19 @@
           # Determine node name (explicit nodeName or hostname)
           nodeName = if cfg.nodeName != null then cfg.nodeName else config.networking.hostName;
 
+          # Parse "host:port" strings, supporting both IPv4 and IPv6 ([::1]:port) formats.
+          parseHostPort = s:
+            let
+              ipv6Match = builtins.match "\\[(.+)\\]:([0-9]+)" s;
+              ipv4Parts = lib.splitString ":" s;
+            in
+              if ipv6Match != null then
+                { address = builtins.elemAt ipv6Match 0; port = lib.toInt (builtins.elemAt ipv6Match 1); }
+              else if builtins.length ipv4Parts == 2 then
+                { address = builtins.elemAt ipv4Parts 0; port = lib.toInt (builtins.elemAt ipv4Parts 1); }
+              else
+                throw "Invalid address:port format: '${s}'. Expected 'host:port' or '[ipv6]:port'.";
+
           # Generate seed servers from cluster.nodes configuration
           seedServers =
             if cfg.cluster.nodes != {} then
@@ -260,16 +300,12 @@
                 seed_servers = mkIf (seedServers != []) seedServers;
 
                 # Auto-populate advertised_rpc_api if configured in cluster.nodes
-                advertised_rpc_api = mkIf (currentNode.rpcAddress != null) {
-                  address = lib.head (lib.splitString ":" currentNode.rpcAddress);
-                  port = lib.toInt (lib.last (lib.splitString ":" currentNode.rpcAddress));
-                };
+                advertised_rpc_api = mkIf (currentNode.rpcAddress != null)
+                  (parseHostPort currentNode.rpcAddress);
 
                 # Auto-populate advertised_kafka_api if configured in cluster.nodes
-                advertised_kafka_api = mkIf (currentNode.kafkaAddress != null) [{
-                  address = lib.head (lib.splitString ":" currentNode.kafkaAddress);
-                  port = lib.toInt (lib.last (lib.splitString ":" currentNode.kafkaAddress));
-                }];
+                advertised_kafka_api = mkIf (currentNode.kafkaAddress != null)
+                  [ (parseHostPort currentNode.kafkaAddress) ];
 
                 # Set rack awareness if configured
                 rack = mkIf (currentNode.rack != null) currentNode.rack;

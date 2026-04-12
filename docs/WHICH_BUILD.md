@@ -1,201 +1,161 @@
 # Which Redpanda Build Should I Use?
 
-This project provides three Redpanda packages. Use this guide to choose the right one.
+This project provides five Redpanda packages. Use this guide to choose the right one.
 
 ## Quick Decision Tree
 
 ```
-Do you need FIPS 140-2 compliance?
-├─ YES → Are you deploying to production?
-│  ├─ YES → Use redpanda-fips (pre-built FIPS packages)
-│  └─ NO  → Use redpanda-bazel (build FIPS from source for testing)
+Need CMVP-certified FIPS?
+├─ YES → redpanda-fips (NIST-certified deb extraction)
 │
-└─ NO → Are you a Redpanda employee developing features?
-   ├─ YES → Use redpanda-bazel (source builds for development)
-   └─ NO  → Use redpanda (default - fast pre-built packages)
+└─ NO → Need maximum compliance provenance (SLSA L3)?
+   ├─ YES → redpanda (source build, ~1-4 hours)
+   │
+   └─ NO → Need fast builds?
+      ├─ YES → redpanda-deb (deb extraction, ~5 min)
+      │
+      └─ Just need the CLI? → redpanda-rpk
 ```
 
-## The Three Packages
+## The Packages
 
-### 1. `redpanda` (Default) - **Recommended for 99% of users**
+### 1. `redpanda` (Default) — Source Build from Bazel
 
-**Use this if:**
-- ✅ You're an external user
-- ✅ You want fast installation (5-10 min download)
-- ✅ You need SOC 2, NIST 800-161, DoD SBOM, CJIS, or STIG compliance
-- ✅ You don't need FIPS 140-2
+**SLSA Build L3 (self-assessed) | Full provenance | Complete SBOM**
 
-**Installation:**
+The default package builds Redpanda from source using Bazel inside a hermetic Nix sandbox. This provides the strongest possible supply chain provenance — every byte is traceable from git tag to final binary.
+
+Adapted from [redpanda-data/redpanda#29919](https://github.com/redpanda-data/redpanda/pull/29919) by [randomizedcoder](https://github.com/randomizedcoder).
+
 ```bash
-nix build
-# or
 nix build .#redpanda
 ```
 
-**What you get:**
-- Official pre-built binaries from Redpanda
-- Standard OpenSSL cryptography
-- Full compliance (except FIPS 140-2)
-- Best performance
+**Use this if:**
+- You need SLSA Build L3 provenance
+- You need complete SBOMs (all compiled-in C++ libraries visible)
+- You're targeting DoD SBOM Management, NIST 800-161 SR-4, or CJIS supply chain requirements
+- You can afford ~1-4 hour build times (cold build)
 
-**Compliance satisfied:**
-- ✅ SOC 2 Type II
-- ✅ NIST SP 800-161 (C-SCRM)
-- ✅ DoD SBOM Management
-- ✅ FBI CJIS v6.0 (except FIPS crypto)
-- ✅ Anduril NixOS STIG
-- ✅ ISO/IEC 27036
-- ✅ NIST CSF 2.0
+**Build time:** ~1 hour (22 cores), ~4 hours (4 cores, CI free-tier)
+
+**Note:** This build does **not** include [PGO (Profile-Guided Optimization)](https://www.redpanda.com/blog/supercharging-streaming-profile-guided-optimization). Redpanda's official binaries are compiled with PGO + LTO, which yields ~47% lower p999 latencies. If production performance is your priority, use `redpanda-deb` instead.
 
 ---
 
-### 2. `redpanda-fips` - **For FedRAMP High deployments**
+### 2. `redpanda-deb` — Deb Package Extraction
+
+**Fast fallback | SLSA L1 | PGO + LTO optimized | 5 minute builds**
+
+Extracts official pre-built binaries from Redpanda's deb packages on Cloudsmith CDN. SHA256-verified but the binary provenance stops at the publisher — you trust Redpanda's build pipeline. These binaries include PGO and LTO optimizations from Redpanda's release pipeline.
+
+```bash
+nix build .#redpanda-deb
+```
 
 **Use this if:**
-- ✅ You need FedRAMP High compliance
-- ✅ You need FIPS 140-2 validated cryptography
-- ✅ You're deploying to DoD IL4/IL5 environments
-- ✅ You have regulatory requirements for FIPS
+- You want fast installation (5 minutes)
+- SLSA L1 (provenance exists) is sufficient
+- You're doing development/testing and don't need full provenance
+- You need the NixOS module to start quickly
 
-**Installation:**
+---
+
+### 3. `redpanda-fips` — CMVP-Certified FIPS 140-2
+
+**NIST CMVP cert #4985 | FedRAMP High | DoD IL4/IL5**
+
+Uses Redpanda's official FIPS deb packages containing NIST-certified OpenSSL FIPS modules. Building FIPS from source does NOT carry the same CMVP certification — the certification is attached to the specific binary, not the source code.
+
 ```bash
 nix build .#redpanda-fips
 ```
 
-**What you get:**
-- Official pre-built FIPS binaries from Redpanda
-- BoringCrypto (FIPS 140-2 validated)
-- All standard features
-- 10-30% slower (FIPS validation overhead)
+**Use this if:**
+- You need FedRAMP High compliance
+- You need NIST CMVP-validated FIPS 140-2 cryptography
+- You're deploying to DoD IL4/IL5 environments
+- A contract requires FIPS certification (not just FIPS-mode configuration)
 
-**Additional compliance:**
-- ✅ All compliance from `redpanda` package, PLUS:
-- ✅ FedRAMP High (FIPS 140-2)
-- ✅ DoD IL4/IL5 (FIPS cryptography)
-- ✅ NIST SP 800-53 SC-13 (cryptographic protection)
-- ✅ FBI CJIS 5.10 (FIPS-validated encryption)
-
-**Configuration:**
-```nix
-services.redpanda = {
-  enable = true;
-  settings.redpanda = {
-    enable_fips = true;  # Enable FIPS mode
-  };
-};
-```
-
-**Documentation:**
-- https://docs.redpanda.com/current/manage/security/fips-compliance/
+**10-30% performance overhead** from FIPS validation.
 
 ---
 
-### 3. `redpanda-bazel` - **For Redpanda employees & developers**
+### 4. `redpanda-rpk` — Standalone CLI
 
-**Use this if:**
-- ✅ You're a Redpanda employee
-- ✅ You're developing Redpanda features
-- ✅ You need to apply custom patches
-- ✅ You're testing unreleased versions
-- ✅ You're in an air-gapped environment
-- ✅ You need custom FIPS builds (testing)
+**Go binary | Independent from server build**
 
-**Installation:**
+Builds just the `rpk` CLI tool via Go's `buildGoModule`. Useful when you only need the management CLI without the server.
+
 ```bash
-nix build .#redpanda-bazel
+nix build .#redpanda-rpk
+./result/bin/rpk cluster info
 ```
 
-**What you get:**
-- Built from source using Bazel
-- Full control over build flags
-- Latest source code
-- Development flexibility
-- 30-60 min build time (first build)
+---
 
-**When you DON'T need this:**
-- ❌ External users (use `redpanda` instead)
-- ❌ Production FIPS deployments (use `redpanda-fips` instead)
-- ❌ Just want to try Redpanda (use `redpanda` instead)
+### 5. `redpanda-image` / `redpanda-image-debug` — OCI Container
 
-**Development workflow:**
+**~313 MB minimal | Pipe to docker load**
+
+Minimal OCI container image built with `dockerTools.streamLayeredImage`. Debug variant adds bash and coreutils.
+
 ```bash
-# Enter dev shell with Bazel
-nix develop
-
-# Build from source
-bazel build //src/v/redpanda:redpanda --config=release
-
-# Or use Nix wrapper
-nix build .#redpanda-bazel
+nix build .#redpanda-image && ./result | docker load
+docker run -p 9092:9092 -p 9644:9644 redpanda:nix
 ```
 
 ---
 
 ## Comparison Matrix
 
-| Feature | `redpanda` | `redpanda-fips` | `redpanda-bazel` |
-|---------|------------|-----------------|------------------|
-| **Install time** | 5-10 min | 5-10 min | 30-60 min |
-| **Source** | Official deb | Official FIPS deb | Git source |
-| **Cryptography** | OpenSSL | BoringCrypto | Configurable |
-| **Performance** | Fast | 10-30% slower | Fast |
-| **FIPS 140-2** | ❌ | ✅ | ⚠️ Custom |
-| **SOC 2 / NIST 800-161** | ✅ | ✅ | ✅ |
-| **FedRAMP High** | ❌ | ✅ | ⚠️ Custom |
-| **Development** | ❌ | ❌ | ✅ |
-| **Custom patches** | ❌ | ❌ | ✅ |
-| **Recommended for** | External users | FedRAMP/DoD | Redpanda devs |
+| Feature | `redpanda` | `redpanda-deb` | `redpanda-fips` | `redpanda-rpk` |
+|---------|------------|----------------|-----------------|----------------|
+| **Build time** | 1-4 hours | 5 min | 5 min | 2 min |
+| **Source** | Bazel from git tag | Official deb | Official FIPS deb | Go from git tag |
+| **SLSA level** | **L3** (self-assessed) | L1 | L1 | L1 |
+| **SBOM completeness** | Full (all compiled libs) | Partial (wrapper only) | Partial (wrapper only) | Full (Go modules) |
+| **Provenance** | Git → Bazel → Nix store | Cloudsmith URL + SHA256 | Cloudsmith URL + SHA256 | Git → Go → Nix store |
+| **FIPS 140-2** | No | No | **CMVP certified** | No |
+| **FedRAMP High** | No (no FIPS) | No (no FIPS) | **Yes** | N/A |
+| **PGO optimized** | No | **Yes** | **Yes** | N/A |
+| **Custom patches** | Yes | No | No | Yes |
+| **NixOS module** | Yes | Yes | Yes | N/A |
 
 ---
 
 ## Common Questions
 
-### Q: Why not just use FIPS for everything?
+### Q: Why is the source build the default if it takes hours?
 
-**A:** FIPS validation adds 10-30% performance overhead. Only 1-2% of deployments need FIPS 140-2, so most users shouldn't pay the penalty.
+**A:** Compliance. The source build provides SLSA Build L3 provenance, complete SBOMs, and full source-to-binary traceability. These are increasingly required for DoD procurement and federal supply chain security. The deb fallback exists for fast iteration — use `nix build .#redpanda-deb` when you need speed.
 
-### Q: Is `redpanda` less secure than `redpanda-fips`?
+### Q: Is `redpanda-deb` less secure than `redpanda`?
 
-**A:** No. Both use strong cryptography. FIPS is about **validation and certification**, not additional security. Standard OpenSSL is secure and faster.
+**A:** No. Both produce the same Redpanda software. The difference is in **provenance assurance** — how much you can prove about how the binary was built. `redpanda-deb` trusts Redpanda's build pipeline; `redpanda` builds everything from source in an auditable sandbox.
 
-### Q: Can I switch between packages later?
+### Q: Does the source build include PGO (Profile-Guided Optimization)?
 
-**A:** Yes. All packages install the same binaries to the same paths. Data directories are compatible.
+**A:** No. Redpanda's official release pipeline uses a multi-stage [PGO build process](https://www.redpanda.com/blog/supercharging-streaming-profile-guided-optimization): an instrumented build runs representative workloads on a 3-node cluster, collects branch/call-frequency profiles, then recompiles with those profiles applied. This yields significant performance gains — Redpanda reports **47% lower p999 latencies** and **~50% lower p50 latency** from PGO.
 
-### Q: Which package for SOC 2 compliance?
+The Nix source build performs a single-pass compilation without PGO profiles. The official deb packages (`redpanda-deb`, `redpanda-fips`) are built through Redpanda's full pipeline and include PGO + LTO optimizations.
 
-**A:** Use `redpanda` (default). SOC 2 does not require FIPS 140-2.
+**Choose based on your priorities:**
+- **Maximum performance** → `redpanda-deb` (PGO + LTO optimized by Redpanda's pipeline)
+- **Maximum provenance** → `redpanda` (SLSA L3, full source-to-binary traceability, no PGO)
 
-### Q: Which package for HIPAA compliance?
+PGO profiles are source-level (LLVM IR), so they are portable across build systems. If Redpanda publishes `.profdata` files as release artifacts in the future, the source build could apply them via `--fdo_optimize` to get both full provenance and PGO performance.
 
-**A:** Use `redpanda` (default). HIPAA does not require FIPS 140-2.
+### Q: Can I switch between packages?
 
-### Q: Which package for ISO 27001?
-
-**A:** Use `redpanda` (default). ISO 27001 does not require FIPS 140-2.
-
-### Q: Which package for PCI DSS?
-
-**A:** Use `redpanda` (default). PCI DSS requires strong encryption but not FIPS 140-2.
+**A:** Yes. All packages install compatible binaries. Data directories are compatible. The NixOS module works with any package via `services.redpanda.package`.
 
 ### Q: When do I actually need FIPS?
 
-**A:** Only when:
-- Deploying to FedRAMP High environments
-- Deploying to DoD IL4+ (classified networks)
-- Contractually required (some government contracts)
+**A:** Only when contractually or legally required:
+- FedRAMP High environments
+- DoD IL4+ (classified networks)
+- Government contracts specifying FIPS 140-2
 - State/local government mandates (rare)
 
----
-
-## Still Not Sure?
-
-**Default answer: Use `redpanda`** (the default package)
-
-If you're unsure, start with the default `redpanda` package. It covers 99% of compliance requirements and is the fastest option.
-
-You can always switch to `redpanda-fips` later if you discover you need FIPS 140-2.
-
-**Contact:**
-- Redpanda Support: support@redpanda.com
-- Documentation: https://docs.redpanda.com/
+FIPS is about **certification**, not additional security. Standard OpenSSL is cryptographically secure.

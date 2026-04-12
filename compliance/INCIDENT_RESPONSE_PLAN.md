@@ -170,7 +170,7 @@ This plan builds on the following automated controls already in the repository:
 
 | Control | Implementation | Compliance |
 |---------|---------------|------------|
-| SHA256 verification | `default.nix`, `fips.nix` | NIST 800-161 SR-3 |
+| SHA256 verification | `deb.nix`, `fips.nix` | NIST 800-161 SR-3 |
 | Immutable store | `/nix/store` read-only | NIST 800-161 SR-9 |
 | Store integrity verification | `nix-store --verify` | NIST 800-161 SR-10 |
 | Version tag validation | `scripts/update.sh` | SOC 2 CC8.1 |

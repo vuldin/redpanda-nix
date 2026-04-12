@@ -47,10 +47,15 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
-      - name: Build redpanda package
+      - name: Build redpanda deb package (fast validation)
         run: |
-          echo "Building Redpanda package for x86_64-linux..."
-          nix build --show-trace
+          echo "Building Redpanda deb package for x86_64-linux..."
+          nix build .#redpanda-deb --show-trace
+
+      - name: Build rpk CLI
+        run: |
+          echo "Building rpk CLI..."
+          nix build .#redpanda-rpk --show-trace
 
       - name: Check package outputs
         run: |
@@ -60,6 +65,8 @@ jobs:
 
           # Check for required binaries
           test -f ./result/bin/redpanda && echo "✅ redpanda binary found"
+          # Note: source build (.#redpanda) is NOT run in PR CI — it takes
+          # hours on free-tier runners. It runs in the weekly update workflow.
 
   build-examples:
     name: Test Example Configurations

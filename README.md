@@ -1,6 +1,6 @@
 # Redpanda Nix Package
 
-Nix-based Redpanda packaging for Linux with automatic version updates, multi-framework compliance, and CI/CD. Works on any Linux distribution with Nix installed, with additional NixOS module integration for declarative deployments.
+Nix-based Redpanda packaging for Linux with automatic version updates, compliance-relevant security controls, and CI/CD. Works on any Linux distribution with Nix installed, with additional NixOS module integration for declarative deployments.
 
 > **Note**: This is an unofficial, community-maintained package intended for demonstration and evaluation purposes. It is not maintained or supported by Redpanda Data, Inc. Before deploying to production, consult your Redpanda support team to determine whether this packaging approach is supportable for your environment.
 
@@ -11,10 +11,12 @@ Nix-based Redpanda packaging for Linux with automatic version updates, multi-fra
 
 ### Packaging
 
-- **Pre-built packages** from official Redpanda deb packages (5-10 min install)
-- **FIPS 140-2 variant** with BoringCrypto for FedRAMP High deployments
+- **Source builds from Bazel** — SLSA Build L3 (self-assessed), full source-to-binary provenance, complete SBOMs
+- **Deb package fallback** from official Redpanda deb packages (5 min install)
+- **FIPS 140-2 variant** with CMVP-certified BoringCrypto for FedRAMP High deployments
+- **Standalone rpk CLI** via Go's `buildGoModule`
+- **OCI container images** via `dockerTools.streamLayeredImage` (~313 MB minimal)
 - **Version pinning** to tagged stable releases only (e.g., `v26.1.2`)
-- **Nix flakes** for reproducible, declarative builds
 
 ### NixOS Module Integration
 
@@ -26,10 +28,11 @@ Nix-based Redpanda packaging for Linux with automatic version updates, multi-fra
 ### Compliance & Security
 
 - **TLS enforcement** with build-time validation (STIG SC-8, CJIS 5.10)
-- **Automated SBOM generation** in CycloneDX/SPDX with SLSA v1.0 provenance
+- **SLSA Build L3** (self-assessed) with hermetic Nix sandbox source builds
+- **Automated SBOM generation** in CycloneDX/SPDX with SLSA provenance
 - **Vulnerability scanning** via sbomnix with automated CVE detection
 - **CJIS audit retention** with 365-day log retention for FBI compliance
-- **8-framework compliance** covering SOC 2, NIST 800-161, STIG, CJIS, FedRAMP, and more
+- **Security controls** supporting SOC 2, CJIS, NIST, and other frameworks — see [compliance/](./compliance/)
 
 ### CI/CD
 
@@ -117,8 +120,12 @@ sudo ./scripts/uninstall.sh --purge  # removes everything
 
 | Variant | Build Time | Description | When to use |
 |---------|-----------|-------------|-------------|
-| `redpanda` (default) | 5-10 min | Official pre-built binary from Cloudsmith deb | Production and development for most users |
-| `fips` | 5-10 min | Base binary + FIPS 140-2 OpenSSL overlay (BoringCrypto) | FedRAMP High, DoD IL4+, CJIS, or any environment requiring FIPS-validated cryptography |
+| `redpanda` (default) | 1-4 hours | Bazel source build, SLSA Build L3, full SBOM | Supply chain compliance, DoD procurement, provenance audits |
+| `redpanda-deb` | 5-10 min | Official pre-built binary from Cloudsmith deb (PGO + LTO optimized) | Production and development for most users |
+| `redpanda-fips` | 5-10 min | Official FIPS deb with CMVP-certified BoringCrypto (PGO + LTO optimized) | FedRAMP High, DoD IL4+, CJIS, or any environment requiring FIPS-validated cryptography |
+| `redpanda-rpk` | 2 min | Standalone rpk CLI via Go's `buildGoModule` | CLI management without the server |
+
+> **Performance note:** The source build (`redpanda`) does not include [PGO](https://www.redpanda.com/blog/supercharging-streaming-profile-guided-optimization), which Redpanda's official binaries use for ~47% lower tail latencies. For production performance, use `redpanda-deb`. See [docs/WHICH_BUILD.md](./docs/WHICH_BUILD.md) for a detailed comparison.
 
 ## Configuration
 
@@ -198,7 +205,7 @@ The `scripts/update.sh` script automates package updates:
 ./scripts/update.sh 26.1.2
 ```
 
-The script validates the release tag, downloads the official deb, generates `default.nix` with the correct hash, updates `flake.nix`, and generates compliance artifacts (SBOM, SLSA provenance, vulnerability scan).
+The script validates the release tag, downloads the official deb, generates `deb.nix` with the correct hash, updates `flake.nix`, and generates compliance artifacts (SBOM, SLSA provenance, vulnerability scan).
 
 ## Module Options (NixOS only)
 
@@ -234,13 +241,13 @@ See [examples/](./examples/) for complete configurations including TLS and multi
 ## Architecture
 
 ```
-scripts/update.sh -> default.nix -> flake.nix -> Nix package + NixOS module
+scripts/update.sh -> deb.nix + source/build.nix -> flake.nix -> Nix package + NixOS module
        |                 |              |              |
    Fetch + hash     Package def    Build system   Package for any Linux
    from Cloudsmith   (deb extract)  + distribution  + NixOS service/firewall
 ```
 
-- `default.nix` = How to package Redpanda (auto-generated by `scripts/update.sh`)
+- `deb.nix` = Deb package extraction (fast fallback) (auto-generated by `scripts/update.sh`)
 - `flake.nix` = Nix flake providing the package (any Linux) and NixOS module (NixOS only)
 
 ## Port Reference
@@ -255,22 +262,20 @@ scripts/update.sh -> default.nix -> flake.nix -> Nix package + NixOS module
 
 ## Compliance
 
-This package targets 8 compliance frameworks. Percentages reflect implemented, verifiable controls as of 2026-04-10. See [compliance/COMPLIANCE_MATRIX.md](./compliance/COMPLIANCE_MATRIX.md) for detailed gap analysis.
+This package provides technical controls that support multiple compliance frameworks. Organizational controls (audits, training, policies) are deployer responsibility. See [compliance/COMPLIANCE_MATRIX.md](./compliance/COMPLIANCE_MATRIX.md) for detailed control mapping.
 
-| Framework | Implemented | Key Gap |
-|-----------|-------------|---------|
-| SOC 2 Type II | ~95% | Audit evidence collection automated but not continuously running |
-| FBI CJIS Security Policy v6.0 | ~90% | `cjisCompliant` preset available; MFA still deployer-dependent |
-| NIST SP 800-161 (Supply Chain) | ~85% | SBOMs distributed via `compliance/current/` and GitHub Releases |
-| ISO/IEC 27036 | ~75% | Supplier agreement template available; formal signing required |
-| FedRAMP High | ~58% | 3PAO assessment and SSP required (organizational) |
-| DoD SBOM Management (Jan 2024) | ~85% | SBOMs distributed; continuous scanning via weekly workflow |
-| NIST CSF 2.0 (Feb 2024) | ~75% | Incident response plan and CVE scanning implemented |
-| Anduril NixOS STIG (Dec 2024) | ~60% | Structured audit logging via `auditLog` option |
+| Framework | Coverage | Key Gap |
+|-----------|----------|---------|
+| SLSA v1.0 | Build L3 (self-assessed) | Formal conformance program not yet completed |
+| SOC 2 Type II | Strong | Continuous evidence collection is deployer responsibility |
+| FBI CJIS v6.0 | Strong | MFA and personnel controls are deployer-dependent |
+| NIST SP 800-161 | Strong | Full source-to-binary provenance via source build |
+| FedRAMP High | Partial | 3PAO assessment and SSP required (organizational) |
+| DoD SBOM Management | Strong | SBOM generation supported via `scripts/update.sh` |
 
 Key controls: reproducible builds, SHA256 verification, immutable `/nix/store`, automated SBOM (CycloneDX/SPDX), SLSA v1.0 provenance, systemd hardening, TLS enforcement, 365-day audit retention.
 
-Running `./scripts/update.sh` automatically generates compliance artifacts (SBOM, provenance, vulnerability scan) saved to `compliance/`.
+Running `./scripts/update.sh` generates compliance artifacts (SBOM, provenance, vulnerability scan) saved to `compliance/`.
 
 ## Documentation
 
@@ -284,6 +289,10 @@ Running `./scripts/update.sh` automatically generates compliance artifacts (SBOM
 2. Test the build: `nix build`
 3. Test: `nix flake check`, and optionally test the NixOS module in a configuration
 4. Submit changes (or review the automated PR)
+
+## Acknowledgments
+
+The source build approach (`source/build.nix`) is adapted from [redpanda-data/redpanda#29919](https://github.com/redpanda-data/redpanda/pull/29919) by [randomizedcoder](https://github.com/randomizedcoder). That PR introduced the Bazel-in-Nix build architecture including the fetch-nixify-build loop, pre-built C/C++ dependency strategy, and declarative nixify rules that this project builds upon.
 
 ## License
 
