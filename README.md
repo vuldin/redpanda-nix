@@ -47,9 +47,9 @@ Nix-based Redpanda packaging for Linux with automatic version updates, complianc
 - `curl` for GitHub API (used by update script)
 - `jq` for JSON parsing
 
-### For Ubuntu / Debian / RHEL / CentOS / macOS
+### For Other Linux (Ubuntu, Debian, RHEL, CentOS, etc.)
 - Install Nix package manager first: `sh <(curl -L https://nixos.org/nix/install) --daemon`
-- See [docs/INSTALLATION_GUIDE.md](./docs/INSTALLATION_GUIDE.md) for platform-specific instructions
+- See [docs/INSTALLATION_GUIDE.md](./docs/INSTALLATION_GUIDE.md) for Nix installation details, SELinux, and firewall setup
 
 ## Quick Start
 

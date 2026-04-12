@@ -3,62 +3,65 @@
 ## Table of Contents
 
 1. [Quick Start](#1-quick-start)
-2. [Install Nix on Non-NixOS Linux](#2-install-nix-on-non-nixos-linux)
-3. [Building the Redpanda Package](#3-building-the-redpanda-package)
-4. [Creating System Services](#4-creating-system-services)
+2. [Installing Nix](#2-installing-nix)
+3. [Firewall Configuration](#3-firewall-configuration)
+4. [Verification](#4-verification)
 5. [Compliance Artifacts](#5-compliance-artifacts)
-6. [Troubleshooting](#6-troubleshooting)
-7. [Updating and Maintenance](#7-updating-and-maintenance)
-8. [Uninstallation](#8-uninstallation)
+6. [Updating and Maintenance](#6-updating-and-maintenance)
+7. [Uninstallation](#7-uninstallation)
+8. [Troubleshooting](#8-troubleshooting)
+9. [Reference: What install.sh Does](#9-reference-what-installsh-does)
 
 ---
 
 ## 1. Quick Start
 
-```bash
-# 1. Install Nix (automatically detects your OS)
-sh <(curl -L https://nixos.org/nix/install) --daemon
-
-# 2. Enable flakes
-mkdir -p ~/.config/nix && echo "experimental-features = nix-command flakes" > ~/.config/nix/nix.conf
-
-# 3. Build Redpanda
-git clone <repository-url> redpanda-nix && cd redpanda-nix && nix build
-```
-
-**Time to Install**: 5-10 minutes
-**Disk Space Required**: 10-50GB for `/nix/store`
+Prerequisites: a Linux system with systemd and [Nix installed with flakes enabled](#2-installing-nix).
 
 > **macOS**: The Redpanda server is Linux-only. For the rpk CLI only: `nix build .#redpanda-rpk`
 
----
+```bash
+git clone <repository-url> redpanda-nix
+cd redpanda-nix
+sudo ./scripts/install.sh
+```
 
-## 2. Install Nix on Non-NixOS Linux
+This single command builds Redpanda, creates a system user, writes a default config, installs a systemd service, and starts Redpanda. See [Section 9](#9-reference-what-installsh-does) for exactly what it does.
 
-Nix installs completely alongside your existing package manager (apt/yum/dnf) without conflicts. Your system packages remain untouched.
-
-**Supported Distributions**:
-- Ubuntu 18.04+ / Debian 9+
-- RHEL 7/8/9 / CentOS / Rocky / Alma
-- NixOS (native support, skip this section)
-
-**Minimum Requirements**:
-- 2GB RAM (4GB+ recommended)
-- 10-50GB free disk space
-- `sudo` access
-- Internet connection
-
-### 2.1 Pre-Installation
+To install the FIPS variant:
 
 ```bash
-# Check available disk space (need 10GB+ free)
-df -h /
+sudo ./scripts/install.sh --variant fips
+```
 
-# Install dependencies
-# Ubuntu/Debian:
+To upgrade after pulling new changes:
+
+```bash
+sudo ./scripts/install.sh  # rebuilds, re-symlinks, and restarts
+```
+
+**Time to install**: 5-10 minutes (deb variant), 1-4 hours (source variant)
+**Disk space**: 10-50 GB for `/nix/store`
+
+---
+
+## 2. Installing Nix
+
+If you already have Nix with flakes enabled, skip to [Quick Start](#1-quick-start).
+
+Nix installs alongside your existing package manager (apt/yum/dnf) without conflicts. Your system packages remain untouched.
+
+**Supported distributions**: Ubuntu 18.04+, Debian 9+, RHEL 7/8/9, CentOS, Rocky, Alma, NixOS (native — skip this section)
+
+**Minimum requirements**: 2 GB RAM (4 GB+ recommended), 10-50 GB free disk, sudo access, internet
+
+### 2.1 Install Dependencies
+
+```bash
+# Ubuntu/Debian
 sudo apt update && sudo apt install -y curl xz-utils
 
-# RHEL/CentOS/Rocky/Alma:
+# RHEL/CentOS/Rocky/Alma
 sudo yum install -y xz curl
 ```
 
@@ -67,13 +70,8 @@ sudo yum install -y xz curl
 **Option A: Standard Nix Installer (Recommended)**
 
 ```bash
-# Multi-user installation (daemon-based)
 sh <(curl -L https://nixos.org/nix/install) --daemon
-
-# Reload shell environment
 source /etc/profile.d/nix.sh
-
-# Verify installation
 nix --version
 ```
 
@@ -82,85 +80,62 @@ nix --version
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf -L \
   https://install.determinate.systems/nix | sh -s -- install
-
 source /etc/profile.d/nix.sh
 nix --version
 ```
 
-**What Gets Installed**:
-- `/nix` directory (isolated from system)
-- `nix-daemon.service` systemd service
-- 32 build users (`nixbld1-nixbld32`)
-- Shell integration in `/etc/profile.d/nix.sh`
-- **NO changes to apt/yum or system packages**
-
-**Troubleshooting**:
-```bash
-# If "nix: command not found"
-exec $SHELL
-# Or manually source
-source /etc/profile.d/nix.sh
-
-# Check daemon status
-systemctl status nix-daemon.service
-```
+**What gets installed**: `/nix` directory (isolated from system), `nix-daemon.service`, 32 build users (`nixbld1`-`nixbld32`), shell integration in `/etc/profile.d/nix.sh`. No changes to apt/yum or system packages.
 
 ### 2.3 Enable Flakes
 
 ```bash
 mkdir -p ~/.config/nix
-cat > ~/.config/nix/nix.conf <<EOF
-experimental-features = nix-command flakes
-EOF
+echo "experimental-features = nix-command flakes" > ~/.config/nix/nix.conf
 ```
 
 ### 2.4 RHEL/CentOS: SELinux Considerations
 
-**Important**: RHEL-family distributions have SELinux enabled by default.
+RHEL-family distributions have SELinux enabled by default.
 
-#### Multi-User Install (Requires SELinux Disabled/Permissive)
-
-Recommended for production servers and shared environments.
+**Multi-user install** (recommended for servers):
 
 ```bash
-# Check SELinux status
-getenforce
-
-# Temporarily disable (for installation)
+# Temporarily set permissive for installation
 sudo setenforce 0
-
-# Install Nix (see 2.2 above), then optionally re-enable
+# Install Nix (see 2.2 above), then re-enable
 sudo setenforce 1
 ```
 
-**Permanent SELinux Disable** (if required):
+To permanently set permissive (if required):
+
 ```bash
 sudo sed -i 's/^SELINUX=enforcing/SELINUX=permissive/' /etc/selinux/config
 sudo reboot
 ```
 
-#### Single-User Install (SELinux Compatible)
-
-Recommended for developer workstations or strict SELinux policies.
+**Single-user install** (SELinux compatible, for developer workstations):
 
 ```bash
 sh <(curl -L https://nixos.org/nix/install) --no-daemon
 source ~/.nix-profile/etc/profile.d/nix.sh
-nix --version
 ```
 
-Trade-offs: SELinux stays enabled, no system users or daemon needed, but builds run as your user and `/nix/store` cannot be shared.
+Trade-offs: SELinux stays enforcing, no daemon or system users needed, but builds run as your user and `/nix/store` cannot be shared.
 
-#### Determinate Systems Installer (Handles SELinux Automatically)
+**Determinate Systems Installer** handles SELinux automatically:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf -L \
   https://install.determinate.systems/nix | sh -s -- install
 ```
 
-### 2.5 Firewall Configuration
+---
 
-#### Ubuntu/Debian (UFW)
+## 3. Firewall Configuration
+
+The install script does not modify firewall rules. If your firewall is active, open the Redpanda ports:
+
+### Ubuntu/Debian (UFW)
 
 ```bash
 sudo ufw allow 9092/tcp   # Kafka API
@@ -171,165 +146,30 @@ sudo ufw allow 33145/tcp  # RPC (for clusters)
 sudo ufw reload
 ```
 
-#### RHEL/CentOS/Rocky/Alma (firewalld)
+### RHEL/CentOS/Rocky/Alma (firewalld)
 
 ```bash
-sudo firewall-cmd --permanent --add-port=9092/tcp   # Kafka API
-sudo firewall-cmd --permanent --add-port=9644/tcp   # Admin API
-sudo firewall-cmd --permanent --add-port=8081/tcp   # Schema Registry
-sudo firewall-cmd --permanent --add-port=8082/tcp   # HTTP Proxy
-sudo firewall-cmd --permanent --add-port=33145/tcp  # RPC
+sudo firewall-cmd --permanent --add-port=9092/tcp
+sudo firewall-cmd --permanent --add-port=9644/tcp
+sudo firewall-cmd --permanent --add-port=8081/tcp
+sudo firewall-cmd --permanent --add-port=8082/tcp
+sudo firewall-cmd --permanent --add-port=33145/tcp
 sudo firewall-cmd --reload
-sudo firewall-cmd --list-ports
 ```
+
+> **NixOS note**: On NixOS, set `services.redpanda.openFirewall = true` instead — the module auto-opens all configured listener ports.
 
 ---
 
-## 3. Building the Redpanda Package
+## 4. Verification
 
-### 3.1 Clone Repository
-
-```bash
-git clone <repository-url> redpanda-nix
-cd redpanda-nix
-```
-
-### 3.2 Build Redpanda Package
+After `install.sh` completes:
 
 ```bash
-# Build latest version
-nix build
+# Check service status
+systemctl status redpanda
 
-# Build outputs a symlink: result -> /nix/store/...-redpanda-VERSION
-ls -lh result/
-
-# Test rpk CLI
-nix run .#rpk -- --help
-
-# Test full Redpanda binary
-nix run .#redpanda -- --help
-```
-
-### 3.3 Update to Specific Version (Optional)
-
-```bash
-./scripts/update.sh 25.2.8
-nix build
-./result/bin/redpanda --version
-```
-
----
-
-## 4. Creating System Services
-
-Since this is a Nix package on non-NixOS systems, you need to create native systemd services.
-
-### Step 1: Create Redpanda User
-
-```bash
-sudo useradd --system --home-dir /var/lib/redpanda \
-  --create-home --shell /usr/sbin/nologin redpanda
-```
-
-### Step 2: Install Binaries
-
-```bash
-sudo ln -sf $(readlink -f result)/bin/redpanda /usr/local/bin/redpanda
-sudo ln -sf $(readlink -f result)/bin/rpk /usr/local/bin/rpk
-
-which redpanda rpk
-redpanda --version
-```
-
-### Step 3: Create Configuration
-
-```bash
-sudo mkdir -p /etc/redpanda
-
-sudo tee /etc/redpanda/redpanda.yaml <<EOF
-redpanda:
-  data_directory: /var/lib/redpanda/data
-  node_id: 0
-  rpc_server:
-    address: 0.0.0.0
-    port: 33145
-  kafka_api:
-    - address: 0.0.0.0
-      port: 9092
-  admin:
-    - address: 0.0.0.0
-      port: 9644
-  developer_mode: true
-
-pandaproxy:
-  pandaproxy_api:
-    - address: 0.0.0.0
-      port: 8082
-
-schema_registry:
-  schema_registry_api:
-    - address: 0.0.0.0
-      port: 8081
-EOF
-
-sudo chown -R redpanda:redpanda /etc/redpanda /var/lib/redpanda
-sudo chmod 0750 /var/lib/redpanda
-```
-
-### Step 4: Create systemd Service
-
-```bash
-sudo tee /etc/systemd/system/redpanda.service <<EOF
-[Unit]
-Description=Redpanda (Nix Package)
-Documentation=https://docs.redpanda.com/
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=redpanda
-Group=redpanda
-ExecStart=/usr/local/bin/redpanda \\
-  --redpanda-cfg /etc/redpanda/redpanda.yaml \\
-  --default-log-level=info
-
-# Security hardening (from NixOS module)
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=true
-PrivateTmp=true
-ProtectKernelTunables=true
-ProtectControlGroups=true
-RestrictSUIDSGID=true
-ReadWritePaths=/var/lib/redpanda /var/log/redpanda
-
-# Resource limits
-LimitNOFILE=65536
-LimitNPROC=4096
-
-# Restart policy
-Restart=on-failure
-RestartSec=10s
-
-[Install]
-WantedBy=multi-user.target
-EOF
-```
-
-### Step 5: Start Service
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl start redpanda
-sudo systemctl status redpanda
-sudo systemctl enable redpanda
-sudo journalctl -u redpanda -f
-```
-
-### Step 6: Verify Installation
-
-```bash
+# Test with rpk
 rpk cluster info
 rpk topic create test-topic
 echo "Hello from Nix Redpanda!" | rpk topic produce test-topic
@@ -368,104 +208,31 @@ nix-store -q --requisites $(nix build .#redpanda-deb --print-out-paths)
 
 ---
 
-## 6. Troubleshooting
+## 6. Updating and Maintenance
 
-### 6.1 Common Issues (All Distributions)
-
-#### "nix: command not found"
-
-```bash
-source /etc/profile.d/nix.sh
-# Or restart shell
-exec $SHELL
-```
-
-#### "experimental features not enabled"
-
-```bash
-mkdir -p ~/.config/nix
-echo "experimental-features = nix-command flakes" > ~/.config/nix/nix.conf
-```
-
-#### Permission denied errors
-
-```bash
-# Check nix-daemon is running
-systemctl status nix-daemon
-
-# Restart daemon
-sudo systemctl restart nix-daemon
-```
-
-### 6.2 Ubuntu/Debian Specific
-
-#### systemd service won't start
-
-```bash
-sudo journalctl -u redpanda -n 50
-which redpanda
-ls -l /var/lib/redpanda
-sudo chown -R redpanda:redpanda /var/lib/redpanda
-```
-
-### 6.3 RHEL/CentOS Specific
-
-#### SELinux denials
-
-```bash
-# Check for SELinux denials
-sudo ausearch -m avc -ts recent
-
-# Temporarily disable SELinux
-sudo setenforce 0
-
-# Or use single-user Nix install
-sh <(curl -L https://nixos.org/nix/install) --no-daemon
-```
-
-#### Firewall blocking connections
-
-```bash
-sudo firewall-cmd --list-all
-sudo ss -tlnp | grep redpanda
-sudo firewall-cmd --add-port=9092/tcp --permanent
-sudo firewall-cmd --reload
-```
-
----
-
-## 7. Updating and Maintenance
-
-### 7.1 Update Redpanda Version
+### Update Redpanda Version
 
 ```bash
 cd redpanda-nix
 
 # Update to latest or specific version
-./scripts/update.sh 25.3.1
+./scripts/update.sh 26.1.2
 
-# Rebuild
-nix build
-
-# Update symlinks
-sudo ln -sf $(readlink -f result)/bin/redpanda /usr/local/bin/redpanda
-sudo ln -sf $(readlink -f result)/bin/rpk /usr/local/bin/rpk
-
-# Restart service
-sudo systemctl restart redpanda
+# Rebuild and reinstall
+sudo ./scripts/install.sh
 ```
 
-### 7.2 Update Nix Itself
+### Update Nix Itself
 
 ```bash
 nix upgrade-nix
 nix --version
 ```
 
-### 7.3 Garbage Collection
+### Garbage Collection
 
 ```bash
-# Clean up old Nix store paths
+# Clean up old store paths
 nix-collect-garbage
 
 # Aggressive cleanup (delete old generations)
@@ -477,22 +244,16 @@ du -sh /nix/store
 
 ---
 
-## 8. Uninstallation
+## 7. Uninstallation
 
-### 8.1 Remove Redpanda Service
+### Remove Redpanda
 
 ```bash
-sudo systemctl stop redpanda
-sudo systemctl disable redpanda
-sudo rm /etc/systemd/system/redpanda.service
-sudo systemctl daemon-reload
-
-sudo rm /usr/local/bin/redpanda /usr/local/bin/rpk
-sudo rm -rf /var/lib/redpanda /etc/redpanda
-sudo userdel redpanda
+sudo ./scripts/uninstall.sh          # keeps config and data
+sudo ./scripts/uninstall.sh --purge  # removes everything
 ```
 
-### 8.2 Uninstall Nix (Optional)
+### Uninstall Nix (Optional)
 
 **Warning**: This removes ALL Nix packages, not just Redpanda.
 
@@ -504,22 +265,84 @@ sudo /nix/nix-installer uninstall
 sudo systemctl stop nix-daemon
 sudo systemctl disable nix-daemon
 sudo rm -rf /nix /etc/nix ~/.nix-* /etc/profile.d/nix.sh
-
-# Remove build users
 for i in {1..32}; do sudo userdel nixbld$i; done
 sudo groupdel nixbld
 ```
 
 ---
 
-## Next Steps
+## 8. Troubleshooting
 
-After installation, see:
+### "nix: command not found"
 
-- **[REDPANDA_FIPS_NIXOS.md](./REDPANDA_FIPS_NIXOS.md)** - FIPS 140-2 compliance
-- **[WHICH_BUILD.md](./WHICH_BUILD.md)** - Choose the right build approach
-- **[compliance/COMPLIANCE_MATRIX.md](../compliance/COMPLIANCE_MATRIX.md)** - Multi-framework compliance analysis
+```bash
+source /etc/profile.d/nix.sh
+# Or restart shell
+exec $SHELL
+```
+
+### "experimental features not enabled"
+
+```bash
+mkdir -p ~/.config/nix
+echo "experimental-features = nix-command flakes" > ~/.config/nix/nix.conf
+```
+
+### Permission denied errors
+
+```bash
+# Check nix-daemon is running
+systemctl status nix-daemon
+sudo systemctl restart nix-daemon
+```
+
+### systemd service won't start
+
+```bash
+sudo journalctl -u redpanda -n 50
+which redpanda
+ls -l /var/lib/redpanda
+sudo chown -R redpanda:redpanda /var/lib/redpanda
+```
+
+### SELinux denials (RHEL/CentOS)
+
+```bash
+sudo ausearch -m avc -ts recent
+# Temporarily disable
+sudo setenforce 0
+# Or use single-user Nix install (see Section 2.4)
+```
+
+### Firewall blocking connections
+
+```bash
+sudo ss -tlnp | grep -E '9092|9644|8081|8082|33145'
+# See Section 3 for firewall rules
+```
 
 ---
 
-**Last Updated**: 2026-04-12
+## 9. Reference: What install.sh Does
+
+The `scripts/install.sh` script automates the following steps. This section is for reference — you do not need to run these manually.
+
+1. **Builds the package** — runs `nix build` for the selected variant (or uses an existing `result` symlink)
+2. **Creates system user** — adds a `redpanda` user and group (`useradd --system`)
+3. **Creates directories** — `/var/lib/redpanda/data` and `/etc/redpanda` with correct ownership
+4. **Symlinks binary** — links the Nix store binary to `/usr/local/bin/redpanda`
+5. **Writes default config** — creates `/etc/redpanda/redpanda.yaml` if it doesn't exist (single-node, developer mode). Existing configs are preserved on upgrade.
+6. **Installs systemd service** — writes `/etc/systemd/system/redpanda.service` with security hardening (`NoNewPrivileges`, `ProtectSystem=strict`, `PrivateTmp`, etc.)
+7. **Starts/restarts service** — enables and starts Redpanda, or restarts if already running
+
+The script is idempotent — safe to re-run after rebuilds to upgrade in place.
+
+The `scripts/uninstall.sh` script reverses these steps: stops the service, removes the systemd unit and binary symlink. With `--purge`, it also removes config, data, and the system user.
+
+---
+
+## Next Steps
+
+- **[WHICH_BUILD.md](./WHICH_BUILD.md)** — Choose the right build approach
+- **[REDPANDA_FIPS_NIXOS.md](./REDPANDA_FIPS_NIXOS.md)** — FIPS 140-2 deployment
+- **[compliance/COMPLIANCE_MATRIX.md](../compliance/COMPLIANCE_MATRIX.md)** — Compliance control mapping
