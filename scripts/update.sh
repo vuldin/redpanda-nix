@@ -283,10 +283,12 @@ EOF
 
     echo "✓ Generated deb.nix for version ${version}"
 
-    # Update flake.nix if it exists
+    # Update Redpanda version in flake.nix.
+    # Only replace the version on the line above srcHash (not other version
+    # strings like the Go override). Uses a two-line sed match.
     if [ -f "${SCRIPT_DIR}/flake.nix" ]; then
         echo "Updating version in flake.nix..."
-        sed -i "s/version = \".*\"/version = \"${version}\"/" "${SCRIPT_DIR}/flake.nix"
+        sed -i '/# These must match a tagged Redpanda release/{n; s/version = "[0-9.]*"/version = "'"${version}"'"/}' "${SCRIPT_DIR}/flake.nix"
         echo "✓ Updated flake.nix"
     fi
 
