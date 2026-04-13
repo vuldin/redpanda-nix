@@ -109,7 +109,12 @@ jobs:
 
       - name: Commit changes
         run: |
-          git add deb.nix fips.nix flake.nix compliance/
+          git add deb.nix fips.nix flake.nix rpk.nix
+          git add -f compliance/redpanda-${{ needs.check-update.outputs.new_version }}-sbom.cdx.json \
+                     compliance/redpanda-${{ needs.check-update.outputs.new_version }}-sbom.spdx.json \
+                     compliance/redpanda-${{ needs.check-update.outputs.new_version }}-provenance.json \
+                     compliance/redpanda-${{ needs.check-update.outputs.new_version }}-vulnerabilities.csv \
+                     compliance/supply-chain-events.jsonl 2>/dev/null || true
           git commit -m "Update Redpanda to v${{ needs.check-update.outputs.new_version }}
 
           Automated update from ${{ needs.check-update.outputs.current_version }} to ${{ needs.check-update.outputs.new_version }}
@@ -301,7 +306,7 @@ jobs:
 
           ### SBOM Files
           \`\`\`
-          compliance/redpanda-${{ needs.check-update.outputs.new_version }}-sbom.json (CycloneDX)
+          compliance/redpanda-${{ needs.check-update.outputs.new_version }}-sbom.cdx.json (CycloneDX)
           compliance/redpanda-${{ needs.check-update.outputs.new_version }}-sbom.spdx.json (SPDX)
           \`\`\`
 
@@ -324,7 +329,7 @@ jobs:
           nix-store --verify --check-contents \$(nix-build)
 
           # View SBOM
-          cat compliance/redpanda-${{ needs.check-update.outputs.new_version }}-sbom.json | jq
+          cat compliance/redpanda-${{ needs.check-update.outputs.new_version }}-sbom.cdx.json | jq
 
           # Check for vulnerabilities
           cat compliance/redpanda-${{ needs.check-update.outputs.new_version }}-vulnerabilities.csv
@@ -364,7 +369,7 @@ jobs:
 
             SBOM and provenance files are attached to this release for DoD SBOM Management and NIST SP 800-161 compliance.
           files: |
-            compliance/redpanda-${{ needs.check-update.outputs.new_version }}-sbom.json
+            compliance/redpanda-${{ needs.check-update.outputs.new_version }}-sbom.cdx.json
             compliance/redpanda-${{ needs.check-update.outputs.new_version }}-sbom.spdx.json
             compliance/redpanda-${{ needs.check-update.outputs.new_version }}-provenance.json
             compliance/redpanda-${{ needs.check-update.outputs.new_version }}-vulnerabilities.csv

@@ -465,8 +465,8 @@ echo "=== CJIS 5.11 System Integrity ===" > cjis-evidence/5.11-integrity.txt
 nix-store --verify --check-contents $(nix build .#redpanda-deb --print-out-paths) >> cjis-evidence/5.11-integrity.txt
 
 # Supply Chain: SBOM + Provenance
-sbomnix $(nix build .#redpanda-deb --print-out-paths) --sbom cyclonedx --output cjis-evidence/sbom.json
-sbomnix $(nix build .#redpanda-deb --print-out-paths) --provenance slsa --output cjis-evidence/provenance.json
+sbomnix $(nix build .#redpanda-deb --print-out-paths) --cdx cjis-evidence/sbom.cdx.json
+provenance $(nix build .#redpanda-deb --print-out-paths) --out cjis-evidence/provenance.json
 
 # Package for CJIS audit
 tar czf cjis-compliance-evidence-$(date +%Y%m%d).tar.gz cjis-evidence/

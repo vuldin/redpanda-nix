@@ -415,11 +415,13 @@ NIST SP 800-161 provides guidance on:
 
 **Implementation Example**:
 ```bash
-# Generate SBOM for Redpanda package
-nix build .#redpanda
-nix2sbom $(nix build .#redpanda-deb --print-out-paths) --output redpanda-sbom.json --format cyclonedx
+# Generate SBOM for Redpanda package (CycloneDX + SPDX)
+sbomnix $(nix build .#redpanda-deb --print-out-paths) --cdx redpanda-sbom.cdx.json --spdx redpanda-sbom.spdx.json
 
-# OR using bombon
+# Generate SLSA provenance
+provenance $(nix build .#redpanda-deb --print-out-paths) --out redpanda-provenance.json
+
+# OR using bombon (CycloneDX only)
 nix run github:nikstur/bombon -- $(nix build .#redpanda-deb --print-out-paths)
 ```
 

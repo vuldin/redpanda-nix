@@ -539,15 +539,12 @@ generate_compliance_artifacts() {
     fi
 
     echo "Building package for compliance scanning..."
-    local build_result
-    if ! build_result=$(nix-build "${SCRIPT_DIR}/deb.nix" 2>&1); then
+    local store_path
+    if ! store_path=$(nix build "${SCRIPT_DIR}#redpanda-deb" --print-out-paths --no-link 2>&1 | tail -n 1); then
         echo "⚠️  Build failed. Skipping compliance artifacts."
         echo "   Build the package manually and run compliance generation later."
         return
     fi
-
-    # Extract store path from build result
-    local store_path=$(echo "$build_result" | tail -n 1)
 
     if [ -z "$store_path" ] || [ ! -d "$store_path" ]; then
         echo "⚠️  Could not determine store path. Skipping compliance artifacts."
@@ -558,8 +555,8 @@ generate_compliance_artifacts() {
 
     # Generate CycloneDX SBOM
     echo "Generating CycloneDX SBOM..."
-    if sbomnix "$store_path" --sbom cyclonedx --output "$compliance_dir/redpanda-${version}-sbom.json" 2>&1 | grep -v "^$"; then
-        echo "✓ Generated CycloneDX SBOM: compliance/redpanda-${version}-sbom.json"
+    if sbomnix "$store_path" --cdx "$compliance_dir/redpanda-${version}-sbom.cdx.json" 2>&1 | grep -v "^$"; then
+        echo "✓ Generated CycloneDX SBOM: compliance/redpanda-${version}-sbom.cdx.json"
         log_supply_chain_event "sbom_generated" "$version" "success" "CycloneDX format"
     else
         echo "⚠️  SBOM generation had warnings (check output above)"
@@ -568,7 +565,7 @@ generate_compliance_artifacts() {
 
     # Generate SLSA v1.0 Provenance
     echo "Generating SLSA v1.0 provenance attestation..."
-    if sbomnix "$store_path" --provenance slsa --output "$compliance_dir/redpanda-${version}-provenance.json" 2>&1 | grep -v "^$"; then
+    if provenance "$store_path" --out "$compliance_dir/redpanda-${version}-provenance.json" 2>&1 | grep -v "^$"; then
         echo "✓ Generated SLSA provenance: compliance/redpanda-${version}-provenance.json"
         log_supply_chain_event "provenance_generated" "$version" "success" "SLSA v1.0 attestation"
     else
@@ -579,7 +576,7 @@ generate_compliance_artifacts() {
     # Generate vulnerability scan
     echo "Scanning for vulnerabilities (CVE database)..."
     if command -v vulnxscan &> /dev/null; then
-        if vulnxscan "$store_path" --sbom "$compliance_dir/redpanda-${version}-sbom.json" --output "$compliance_dir/redpanda-${version}-vulnerabilities.csv" 2>&1 | grep -v "^$"; then
+        if vulnxscan "$store_path" --out "$compliance_dir/redpanda-${version}-vulnerabilities.csv" 2>&1 | grep -v "^$"; then
             echo "✓ Generated vulnerability scan: compliance/redpanda-${version}-vulnerabilities.csv"
 
             # Check for critical vulnerabilities
@@ -602,7 +599,7 @@ generate_compliance_artifacts() {
 
     # Generate SPDX SBOM (alternative format for DoD)
     echo "Generating SPDX SBOM (alternative format)..."
-    if sbomnix "$store_path" --sbom spdx --output "$compliance_dir/redpanda-${version}-sbom.spdx.json" 2>&1 | grep -v "^$"; then
+    if sbomnix "$store_path" --spdx "$compliance_dir/redpanda-${version}-sbom.spdx.json" 2>&1 | grep -v "^$"; then
         echo "✓ Generated SPDX SBOM: compliance/redpanda-${version}-sbom.spdx.json"
         log_supply_chain_event "sbom_generated" "$version" "success" "SPDX format"
     else
@@ -614,7 +611,7 @@ generate_compliance_artifacts() {
     echo ""
     echo "Signing SBOMs with Sigstore/cosign..."
     if command -v cosign &> /dev/null; then
-        for sbom_file in "$compliance_dir/redpanda-${version}"-sbom*.json; do
+        for sbom_file in "$compliance_dir/redpanda-${version}"-sbom.*.json; do
             if [ -f "$sbom_file" ]; then
                 echo "Signing: $(basename "$sbom_file")..."
                 if cosign sign-blob \

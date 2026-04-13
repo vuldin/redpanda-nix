@@ -332,9 +332,9 @@ This package provides technical controls that support multiple compliance framew
 
 ```bash
 # Using sbomnix (recommended for DoD/NIST — supports CycloneDX, SPDX, SLSA provenance, CVE scanning)
-sbomnix $(nix build .#redpanda --print-out-paths) --sbom cyclonedx --output redpanda-sbom.json
-sbomnix $(nix build .#redpanda --print-out-paths) --provenance slsa --output redpanda-provenance.json
-vulnxscan $(nix build .#redpanda-deb --print-out-paths) --sbom redpanda-sbom.json --output vulns.csv
+sbomnix $(nix build .#redpanda --print-out-paths) --cdx redpanda-sbom.cdx.json
+provenance $(nix build .#redpanda --print-out-paths) --out redpanda-provenance.json
+vulnxscan $(nix build .#redpanda-deb --print-out-paths) --out vulns.csv
 
 # Alternative: bombon (CycloneDX only)
 nix run github:nikstur/bombon -- $(nix build .#redpanda-deb --print-out-paths)

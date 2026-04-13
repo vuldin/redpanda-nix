@@ -29,8 +29,8 @@ main() {
     local found=0
 
     # Copy CycloneDX SBOM
-    if [ -f "$COMPLIANCE_DIR/redpanda-${version}-sbom.json" ]; then
-        cp "$COMPLIANCE_DIR/redpanda-${version}-sbom.json" "$CURRENT_DIR/sbom-cyclonedx.json"
+    if [ -f "$COMPLIANCE_DIR/redpanda-${version}-sbom.cdx.json" ]; then
+        cp "$COMPLIANCE_DIR/redpanda-${version}-sbom.cdx.json" "$CURRENT_DIR/sbom-cyclonedx.json"
         echo "  sbom-cyclonedx.json"
         found=$((found + 1))
     fi

@@ -115,7 +115,7 @@ jobs:
             echo "✅ Compliance directory exists"
 
             # Check for SBOM files
-            if ls compliance/*-sbom.json 1> /dev/null 2>&1; then
+            if ls compliance/*-sbom.cdx.json 1> /dev/null 2>&1; then
               echo "✅ CycloneDX SBOM found"
             else
               echo "⚠️ CycloneDX SBOM not found (expected in version updates)"
