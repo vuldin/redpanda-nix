@@ -33,7 +33,18 @@
         redpanda-fips = pkgs.callPackage ./fips.nix { };
 
         # Standalone rpk CLI (Go, independent from the C++ server build)
-        redpanda-rpk = pkgs.callPackage ./rpk.nix { };
+        # Override Go when nixpkgs lags behind the version rpk requires.
+        # Remove this override once nixpkgs ships Go >= 1.26.2.
+        redpanda-rpk = let
+          go_1_26_2 = pkgs.go_1_26.overrideAttrs (old: rec {
+            version = "1.26.2";
+            src = pkgs.fetchurl {
+              url = "https://go.dev/dl/go${version}.src.tar.gz";
+              hash = "sha256-LpHrtpR6lulDb7KzkmqIAu/mOm03Xf/sT4Kqnb1v1Ds=";
+            };
+          });
+          buildGoModule = pkgs.buildGoModule.override { go = go_1_26_2; };
+        in pkgs.callPackage ./rpk.nix { inherit buildGoModule; };
 
         # OCI container images (pipe to `docker load`)
         # Uses deb package for now (source build produces same binary format)

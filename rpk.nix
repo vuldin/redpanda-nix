@@ -29,7 +29,7 @@ buildGoModule {
   # To update: change version above, then run:
   #   nix build .#redpanda-rpk 2>&1 | grep "got:"
   # and replace this hash with the "got:" value.
-  vendorHash = "sha256-0lxwIemmAdsnGjyF6dNc9YVPrc4VENxSYpcWRiF4KpI=";
+  vendorHash = "sha256-SiMh5Fi3uNOoKzPGEJ+sBkR/uIpci9mKONJiBG7wjtA=";
 
   ldflags =
     let
