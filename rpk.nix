@@ -10,7 +10,7 @@
 
 let
   # Updated by scripts/update.sh — must match a tagged release
-  version = "26.1.2";
+  version = "26.1.4";
   rev = "v${version}";
 in
 buildGoModule {
@@ -21,7 +21,7 @@ buildGoModule {
     owner = "redpanda-data";
     repo = "redpanda";
     inherit rev;
-    hash = "sha256-dY6orYo5t+l0xKEqnCrXiaQ/57rqJnn9RAP67EgDi98=";
+    hash = "sha256-nBn/l4saP5mDH/pCxIcMiX9p2yKM+61SrYXELWNNNyY=";
   };
 
   modRoot = "src/go/rpk";

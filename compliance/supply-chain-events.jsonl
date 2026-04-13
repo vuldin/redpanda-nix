@@ -2,3 +2,15 @@
 {"timestamp":"2026-04-10T03:51:32Z","event":"package_generated","version":"26.1.2","status":"success","details":"DEB package from Cloudsmith (x86_64)"}
 {"timestamp":"2026-04-10T03:51:33Z","event":"fips_package_generated","version":"26.1.2","status":"success","details":"FIPS supplement DEB from Cloudsmith (x86_64)"}
 {"timestamp":"2026-04-10T03:51:33Z","event":"compliance_generation_started","version":"26.1.2","status":"in_progress","details":"Generating SBOM, provenance, and vulnerability scan"}
+{"timestamp":"2026-04-13T20:31:06Z","event":"version_update_started","version":"26.1.4","status":"in_progress","details":"Updating from previous version"}
+{"timestamp":"2026-04-13T20:31:09Z","event":"package_generated","version":"26.1.4","status":"success","details":"DEB package from Cloudsmith (x86_64)"}
+{"timestamp":"2026-04-13T20:31:09Z","event":"fips_package_generated","version":"26.1.4","status":"success","details":"FIPS supplement DEB from Cloudsmith (x86_64)"}
+{"timestamp":"2026-04-13T20:31:12Z","event":"source_hash_updated","version":"26.1.4","status":"success","details":"Source tarball SHA256 (SRI)"}
+{"timestamp":"2026-04-13T20:31:37Z","event":"rpk_updated","version":"26.1.4","status":"success","details":"rpk CLI version and hashes"}
+{"timestamp":"2026-04-13T20:31:37Z","event":"compliance_generation_started","version":"26.1.4","status":"in_progress","details":"Generating SBOM, provenance, and vulnerability scan"}
+{"timestamp":"2026-04-13T20:31:40Z","event":"sbom_generated","version":"26.1.4","status":"success","details":"CycloneDX format"}
+{"timestamp":"2026-04-13T20:31:41Z","event":"provenance_generated","version":"26.1.4","status":"success","details":"SLSA v1.0 attestation"}
+{"timestamp":"2026-04-13T20:31:42Z","event":"vulnerability_scan_completed","version":"26.1.4","status":"success","details":"Critical: 0, High: 0"}
+{"timestamp":"2026-04-13T20:31:43Z","event":"sbom_generated","version":"26.1.4","status":"success","details":"SPDX format"}
+{"timestamp":"2026-04-13T20:31:43Z","event":"sbom_signing","version":"26.1.4","status":"skipped","details":"cosign not available"}
+{"timestamp":"2026-04-13T20:31:43Z","event":"compliance_generation_completed","version":"26.1.4","status":"success","details":"All artifacts generated"}
