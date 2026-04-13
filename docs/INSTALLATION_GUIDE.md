@@ -21,7 +21,7 @@ Prerequisites: a Linux system with systemd and [Nix installed with flakes enable
 > **macOS**: The Redpanda server is Linux-only. For the rpk CLI only: `nix build .#redpanda-rpk`
 
 ```bash
-git clone <repository-url> redpanda-nix
+git clone https://github.com/vuldin/redpanda-nix.git
 cd redpanda-nix
 sudo ./scripts/install.sh
 ```

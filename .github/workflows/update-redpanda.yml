@@ -372,10 +372,22 @@ jobs:
 
             Automated package update from v${{ needs.check-update.outputs.current_version }}.
 
+            ### Install
+
+            ```bash
+            git clone --branch v${{ needs.check-update.outputs.new_version }} https://github.com/${{ github.repository }}.git
+            cd redpanda-nix
+            sudo ./scripts/install.sh
+            ```
+
             ### Compliance Artifacts
 
-            SBOM and provenance files are attached to this release for DoD SBOM Management and NIST SP 800-161 compliance.
-            Verify with: `gh attestation verify`
+            SBOM and provenance files are attached for DoD SBOM Management and NIST SP 800-161 compliance.
+
+            **Verify package integrity after install:**
+            ```bash
+            nix-store --verify --check-contents $(nix build .#redpanda-deb --print-out-paths)
+            ```
           files: |
             artifacts/redpanda-${{ needs.check-update.outputs.new_version }}-sbom.cdx.json
             artifacts/redpanda-${{ needs.check-update.outputs.new_version }}-sbom.spdx.json
