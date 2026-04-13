@@ -952,7 +952,6 @@ REPOS_PATCH
     "--repo_env=GONOSUMDB=*"
     "--repo_env=GOFLAGS=-modcacherw"
     "--spawn_strategy=local"
-    "--jobs=$NIX_BUILD_CORES"
   ];
 
   # No startup args — hermetic builds only (no persistent cache passthrough).
@@ -1058,6 +1057,7 @@ stdenv.mkDerivation {
       fetch \
       --keep_going \
       ${lib.escapeShellArgs commonArgs} \
+      --jobs=$NIX_BUILD_CORES \
       ${lib.escapeShellArgs targets} || true
 
     # ── Phase B+C: Nixify + re-fetch loop ──
@@ -1074,6 +1074,7 @@ stdenv.mkDerivation {
         fetch \
         --keep_going \
         ${lib.escapeShellArgs commonArgs} \
+        --jobs=$NIX_BUILD_CORES \
         ${lib.escapeShellArgs targets}; then
         echo "=== Fetch succeeded on attempt $attempt ==="
         break
@@ -1090,6 +1091,7 @@ stdenv.mkDerivation {
       build \
       --verbose_failures \
       ${lib.escapeShellArgs commonArgs} \
+      --jobs=$NIX_BUILD_CORES \
       ${lib.escapeShellArgs targets}
 
     # Shut down the persistent server

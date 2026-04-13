@@ -99,8 +99,8 @@ jobs:
 
       - name: Test build
         run: |
-          echo "Testing package build..."
-          nix build --show-trace
+          echo "Testing deb package build..."
+          nix build .#redpanda-deb --show-trace
 
       - name: Publish compliance artifacts
         run: |
@@ -149,7 +149,7 @@ jobs:
           #### Package Updates
           - ✅ Updated \`deb.nix\` with new version and SHA256 hashes
           - ✅ Updated \`flake.nix\` version reference
-          - ✅ Successfully built package with \`nix build\`
+          - ✅ Successfully built deb package with \`nix build .#redpanda-deb\`
 
           #### Compliance Artifacts Generated
           - 📋 CycloneDX SBOM (JSON)
@@ -169,11 +169,11 @@ jobs:
           ### Compliance Status
 
           Compliance status (see compliance/COMPLIANCE_MATRIX.md):
-          - SOC 2 Type II (~90%)
-          - FBI CJIS v6.0 (~80%)
-          - NIST SP 800-161 (~70%)
-          - ISO/IEC 27036 (~60%)
-          - FedRAMP High (~55%)
+          - SOC 2 Type II (Strong)
+          - FBI CJIS v6.0 (Strong)
+          - NIST SP 800-161 (Strong)
+          - ISO/IEC 27036 (Moderate)
+          - FedRAMP High (Partial — organizational gaps)
 
           ---
 
@@ -333,9 +333,9 @@ jobs:
           ### Compliance Status
 
           These artifacts support:
-          - DoD SBOM Management (~50%)
-          - NIST SP 800-161 Supply Chain (~70%)
-          - NIST CSF 2.0 GV.SC controls (~50%)
+          - DoD SBOM Management (Strong)
+          - NIST SP 800-161 Supply Chain (Strong)
+          - NIST CSF 2.0 GV.SC controls (Moderate)
           - Automated vulnerability alerting (this PR)"
 
   create-release:

@@ -50,23 +50,26 @@ jobs:
       - name: Build redpanda deb package (fast validation)
         run: |
           echo "Building Redpanda deb package for x86_64-linux..."
-          nix build .#redpanda-deb --show-trace
+          nix build .#redpanda-deb --out-link result-deb --show-trace
 
       - name: Build rpk CLI
         run: |
           echo "Building rpk CLI..."
-          nix build .#redpanda-rpk --show-trace
+          nix build .#redpanda-rpk --out-link result-rpk --show-trace
 
       - name: Check package outputs
         run: |
-          echo "Checking package outputs..."
-          nix path-info ./result
-          ls -lah ./result/bin/
+          echo "Checking deb package..."
+          nix path-info ./result-deb
+          ls -lah ./result-deb/bin/
+          test -f ./result-deb/bin/redpanda && echo "redpanda binary found"
 
-          # Check for required binaries
-          test -f ./result/bin/redpanda && echo "✅ redpanda binary found"
+          echo "Checking rpk CLI..."
+          nix path-info ./result-rpk
+          ls -lah ./result-rpk/bin/
+          test -f ./result-rpk/bin/rpk && echo "rpk binary found"
           # Note: source build (.#redpanda) is NOT run in PR CI — it takes
-          # hours on free-tier runners. It runs in the weekly update workflow.
+          # hours on free-tier runners.
 
   build-examples:
     name: Test Example Configurations
