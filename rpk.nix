@@ -10,7 +10,7 @@
 
 let
   # Updated by scripts/update.sh — must match a tagged release
-  version = "26.1.4";
+  version = "26.1.5";
   rev = "v${version}";
 in
 buildGoModule {
@@ -21,7 +21,7 @@ buildGoModule {
     owner = "redpanda-data";
     repo = "redpanda";
     inherit rev;
-    hash = "sha256-nBn/l4saP5mDH/pCxIcMiX9p2yKM+61SrYXELWNNNyY=";
+    hash = "sha256-TG4iupQ6LXdxu5/vR8RzZJrBFrEdxmvzlUOUMI+6+oo=";
   };
 
   modRoot = "src/go/rpk";
@@ -29,7 +29,7 @@ buildGoModule {
   # To update: change version above, then run:
   #   nix build .#redpanda-rpk 2>&1 | grep "got:"
   # and replace this hash with the "got:" value.
-  vendorHash = "sha256-SiMh5Fi3uNOoKzPGEJ+sBkR/uIpci9mKONJiBG7wjtA=";
+  vendorHash = "sha256-TG4iupQ6LXdxu5/vR8RzZJrBFrEdxmvzlUOUMI+6+oo=";
 
   ldflags =
     let
