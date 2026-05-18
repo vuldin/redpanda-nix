@@ -7,11 +7,11 @@
 
 stdenv.mkDerivation rec {
   pname = "redpanda";
-  version = "26.1.4";
+  version = "26.1.8";
 
   src = fetchurl {
     url = "https://dl.redpanda.com/public/redpanda/deb/any-distro/pool/any-version/main/r/re/redpanda_${version}-1/redpanda_${version}-1_amd64.deb";
-    sha256 = "0k6zfllsjmjcli2zdhib2vgq0mxav56hyfwy0mbvhf9yx2nhafqs";
+    sha256 = "0gmqjwffr645j81wkj3m781xa6q3hsbd62nkad07m6i99vkj6iqb";
   };
 
   nativeBuildInputs = [
