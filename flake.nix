@@ -20,8 +20,8 @@
         redpanda = pkgs.callPackage ./source/build.nix {
           # Version and source hash — updated by scripts/update.sh
           # These must match a tagged Redpanda release (never main/HEAD)
-          version = "26.1.4";
-          srcHash = "sha256-nBn/l4saP5mDH/pCxIcMiX9p2yKM+61SrYXELWNNNyY=";
+          version = "26.2.1";
+          srcHash = "sha256-R9brN2OtAAqrQmRbgFh9aND1bYHshbZ8QLqIrgH5mdQ=";
         };
 
         # Deb: Fast deb package extraction (5 min fallback)

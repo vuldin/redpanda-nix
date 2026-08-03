@@ -7,18 +7,18 @@
 
 stdenv.mkDerivation rec {
   pname = "redpanda-fips";
-  version = "26.1.4";
+  version = "26.2.1";
 
   # The base Redpanda deb (contains the actual binary + libraries)
   src = fetchurl {
     url = "https://dl.redpanda.com/public/redpanda/deb/any-distro/pool/any-version/main/r/re/redpanda_${version}-1/redpanda_${version}-1_amd64.deb";
-    sha256 = "0k6zfllsjmjcli2zdhib2vgq0mxav56hyfwy0mbvhf9yx2nhafqs";
+    sha256 = "0g3k521r7bgyqk85qdpjygw2pwsnr2r9zksy3zh23i4d9x532ras";
   };
 
   # The FIPS supplement deb (FIPS OpenSSL config + FIPS-validated openssl binary)
   fipsSrc = fetchurl {
     url = "https://dl.redpanda.com/public/redpanda/deb/any-distro/pool/any-version/main/r/re/redpanda-fips_${version}-1/redpanda-fips_${version}-1_amd64.deb";
-    sha256 = "01ir6lfb5578k5bcddjv3wncrhbnpj36lmpbcg20lqmhdkdwnb1z";
+    sha256 = "1xfzk7wrh3k4m9i1p9fx8yar41560ksck5li7fd36gr9gpa9p88h";
   };
 
   nativeBuildInputs = [
